@@ -1,0 +1,2 @@
+# Display Hell files as haskell, since it's a subset
+*.hell linguist-language=Haskell
