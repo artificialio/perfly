@@ -17,11 +17,19 @@ share [mkPersist sqlSettings, mkMigrate "migrateAll"] [persistLowerCase|
 Branch
   name Text
   createdAt UTCTime
+  UniqueBranch name
   deriving Show
 
 Commit
   hash Text
   createdAt UTCTime
+  UniqueCommit hash
+  deriving Show
+
+MapBranchCommit
+  branchId BranchId
+  commitId CommitId
+  UniqueMapBranchCommit branchId commitId
   deriving Show
 
 Benchmark
