@@ -1,0 +1,184 @@
+cabal-version: 1.12
+
+-- This file has been generated from package.yaml by hpack version 0.35.2.
+--
+-- see: https://github.com/sol/hpack
+
+name:           perfly
+version:        0.0.0
+build-type:     Simple
+
+library
+  exposed-modules:
+      Measure
+      Perf.DB.Import
+      Perf.DB.Materialize
+      Perf.Types.DB
+      Perf.Types.External
+      Perf.Types.Prim
+      Perf.Types.Web
+      Perf.Web
+      Perf.Web.Chart
+      Perf.Web.Db
+      Perf.Web.Dispatch
+      Perf.Web.Foundation
+      Perf.Web.Layout
+      Perf.Web.Routes
+      Yesod.Lucid
+  other-modules:
+      Paths_perfly
+  hs-source-dirs:
+      src
+  default-extensions:
+      BlockArguments
+      OverloadedStrings
+      DuplicateRecordFields
+      NamedFieldPuns
+      DeriveGeneric
+      DerivingStrategies
+      DeriveAnyClass
+      TypeApplications
+      OverloadedRecordDot
+      ViewPatterns
+      LambdaCase
+      ExplicitNamespaces
+      QuasiQuotes
+      TypeFamilies
+  ghc-options: -Wall
+  build-depends:
+      aeson
+    , base
+    , bytestring
+    , containers
+    , criterion-measurement
+    , directory
+    , exceptions
+    , formatting
+    , hspec-discover
+    , hspec-expectations-lifted
+    , http-types
+    , lucid2
+    , monad-logger
+    , mtl
+    , persistent
+    , persistent-sqlite
+    , persistent-template
+    , resourcet
+    , rio
+    , text
+    , time
+    , transformers
+    , unliftio
+    , wai
+    , wai-extra
+    , warp
+    , yesod
+  default-language: GHC2021
+
+executable perfly
+  main-is: app/Main.hs
+  other-modules:
+      Paths_perfly
+  default-extensions:
+      BlockArguments
+      OverloadedStrings
+      DuplicateRecordFields
+      NamedFieldPuns
+      DeriveGeneric
+      DerivingStrategies
+      DeriveAnyClass
+      TypeApplications
+      OverloadedRecordDot
+      ViewPatterns
+      LambdaCase
+      ExplicitNamespaces
+      QuasiQuotes
+      TypeFamilies
+  ghc-options: -Wall -threaded -rtsopts -with-rtsopts=-N
+  build-depends:
+      aeson
+    , base
+    , bytestring
+    , containers
+    , criterion-measurement
+    , directory
+    , exceptions
+    , formatting
+    , hspec-discover
+    , hspec-expectations-lifted
+    , http-types
+    , lucid2
+    , monad-logger
+    , mtl
+    , perfly
+    , persistent
+    , persistent-sqlite
+    , persistent-template
+    , resourcet
+    , rio
+    , text
+    , time
+    , transformers
+    , unliftio
+    , wai
+    , wai-extra
+    , warp
+    , yesod
+  default-language: GHC2021
+
+test-suite spec
+  type: exitcode-stdio-1.0
+  main-is: Spec.hs
+  other-modules:
+      Perf.ImportSpec
+      Perf.Types.ExternalSpec
+      Paths_perfly
+  hs-source-dirs:
+      test
+  default-extensions:
+      BlockArguments
+      OverloadedStrings
+      DuplicateRecordFields
+      NamedFieldPuns
+      DeriveGeneric
+      DerivingStrategies
+      DeriveAnyClass
+      TypeApplications
+      OverloadedRecordDot
+      ViewPatterns
+      LambdaCase
+      ExplicitNamespaces
+      QuasiQuotes
+      TypeFamilies
+  ghc-options: -Wall -threaded -rtsopts -with-rtsopts=-N
+  build-depends:
+      aeson
+    , base
+    , bytestring
+    , containers
+    , criterion-measurement
+    , directory
+    , exceptions
+    , formatting
+    , hspec
+    , hspec-discover
+    , hspec-expectations-lifted
+    , http-types
+    , lucid2
+    , monad-logger
+    , mtl
+    , perfly
+    , persistent
+    , persistent-sqlite
+    , persistent-template
+    , resourcet
+    , rio
+    , text
+    , time
+    , transformers
+    , unliftio
+    , wai
+    , wai-extra
+    , warp
+    , yesod
+  default-language: GHC2021

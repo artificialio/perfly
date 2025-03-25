@@ -1,0 +1,6 @@
+/dist-newstyle/
+.direnv
+.stack-work
+*.portal
+client_session_key.aes
+perf.sqlite3*

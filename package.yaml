@@ -1,0 +1,73 @@
+name: perfly
+language: GHC2021
+
+default-extensions:
+- BlockArguments
+- OverloadedStrings
+- DuplicateRecordFields
+- NamedFieldPuns
+- DeriveGeneric
+- DerivingStrategies
+- DeriveAnyClass
+- TypeApplications
+- OverloadedRecordDot
+- ViewPatterns
+- LambdaCase
+- ExplicitNamespaces
+- QuasiQuotes
+- TypeFamilies
+
+dependencies:
+- base
+- hspec-expectations-lifted
+- resourcet
+- yesod
+- transformers
+- monad-logger
+- bytestring
+- aeson
+- wai
+- criterion-measurement
+- wai-extra
+- directory
+- warp
+- http-types
+- lucid2
+- mtl
+- time
+- text
+- unliftio
+- exceptions
+- rio
+- formatting
+- persistent-sqlite
+- persistent
+- persistent-template
+- hspec-discover
+- containers
+
+ghc-options:
+- -Wall
+
+library:
+  source-dirs: src
+
+executables:
+  perfly:
+    main: app/Main.hs
+    ghc-options: -threaded -rtsopts -with-rtsopts=-N
+    dependencies:
+      - perfly
+
+tests:
+  spec:
+    main: Spec.hs
+    source-dirs: test
+    ghc-options:
+      - -threaded
+      - -rtsopts
+      - -with-rtsopts=-N
+    dependencies:
+      - perfly
+      - hspec
+      - hspec-discover
