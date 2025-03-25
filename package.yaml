@@ -1,0 +1,62 @@
+name: brossa-perf
+language: GHC2021
+
+default-extensions:
+- BlockArguments
+- OverloadedStrings
+- OverloadedLists
+- DuplicateRecordFields
+- NamedFieldPuns
+- DeriveGeneric
+- DerivingStrategies
+- DeriveAnyClass
+- TypeApplications
+- OverloadedRecordDot
+- ViewPatterns
+- LambdaCase
+- ExplicitNamespaces
+- QuasiQuotes
+
+dependencies:
+- base
+- bytestring
+- aeson
+- wai
+- wai-extra
+- directory
+- warp
+- http-types
+- lucid2
+- time
+- text
+- unliftio
+- exceptions
+- rio
+- formatting
+- persistent-sqlite
+- persistent
+- persistent-template
+- hspec-discover
+
+library:
+  source-dirs: src
+
+executables:
+  brossa-perf:
+    main: app/Main.hs
+    ghc-options: -threaded -rtsopts -with-rtsopts=-N
+    dependencies:
+      - brossa-perf
+
+tests:
+  spec:
+    main: Spec.hs
+    source-dirs: test
+    ghc-options:
+      - -threaded
+      - -rtsopts
+      - -with-rtsopts=-N
+    dependencies:
+      - brossa-perf
+      - hspec
+      - hspec-discover

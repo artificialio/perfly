@@ -1,0 +1,146 @@
+cabal-version: 1.12
+
+-- This file has been generated from package.yaml by hpack version 0.35.2.
+--
+-- see: https://github.com/sol/hpack
+
+name:           brossa-perf
+version:        0.0.0
+build-type:     Simple
+
+library
+  exposed-modules:
+      Perf.Server
+      Perf.Types.DB
+      Perf.Types.External
+  other-modules:
+      Paths_brossa_perf
+  hs-source-dirs:
+      src
+  default-extensions:
+      BlockArguments
+      OverloadedStrings
+      OverloadedLists
+      DuplicateRecordFields
+      NamedFieldPuns
+      DeriveGeneric
+      DerivingStrategies
+      DeriveAnyClass
+      TypeApplications
+      OverloadedRecordDot
+      ViewPatterns
+      LambdaCase
+      ExplicitNamespaces
+      QuasiQuotes
+  build-depends:
+      aeson
+    , base
+    , bytestring
+    , directory
+    , exceptions
+    , formatting
+    , hspec-discover
+    , http-types
+    , lucid2
+    , persistent
+    , persistent-sqlite
+    , persistent-template
+    , rio
+    , text
+    , time
+    , unliftio
+    , wai
+    , wai-extra
+    , warp
+  default-language: GHC2021
+
+executable brossa-perf
+  main-is: app/Main.hs
+  other-modules:
+      Paths_brossa_perf
+  default-extensions:
+      BlockArguments
+      OverloadedStrings
+      OverloadedLists
+      DuplicateRecordFields
+      NamedFieldPuns
+      DeriveGeneric
+      DerivingStrategies
+      DeriveAnyClass
+      TypeApplications
+      OverloadedRecordDot
+      ViewPatterns
+      LambdaCase
+      ExplicitNamespaces
+      QuasiQuotes
+  ghc-options: -threaded -rtsopts -with-rtsopts=-N
+  build-depends:
+      aeson
+    , base
+    , brossa-perf
+    , bytestring
+    , directory
+    , exceptions
+    , formatting
+    , hspec-discover
+    , http-types
+    , lucid2
+    , persistent
+    , persistent-sqlite
+    , persistent-template
+    , rio
+    , text
+    , time
+    , unliftio
+    , wai
+    , wai-extra
+    , warp
+  default-language: GHC2021
+
+test-suite spec
+  type: exitcode-stdio-1.0
+  main-is: Spec.hs
+  other-modules:
+      Perf.Types.ExternalSpec
+      Paths_brossa_perf
+  hs-source-dirs:
+      test
+  default-extensions:
+      BlockArguments
+      OverloadedStrings
+      OverloadedLists
+      DuplicateRecordFields
+      NamedFieldPuns
+      DeriveGeneric
+      DerivingStrategies
+      DeriveAnyClass
+      TypeApplications
+      OverloadedRecordDot
+      ViewPatterns
+      LambdaCase
+      ExplicitNamespaces
+      QuasiQuotes
+  ghc-options: -threaded -rtsopts -with-rtsopts=-N
+  build-depends:
+      aeson
+    , base
+    , brossa-perf
+    , bytestring
+    , directory
+    , exceptions
+    , formatting
+    , hspec
+    , hspec-discover
+    , http-types
+    , lucid2
+    , persistent
+    , persistent-sqlite
+    , persistent-template
+    , rio
+    , text
+    , time
+    , unliftio
+    , wai
+    , wai-extra
+    , warp
+  default-language: GHC2021
