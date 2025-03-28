@@ -42,6 +42,7 @@ library
     , exceptions
     , formatting
     , hspec-discover
+    , hspec-expectations-lifted
     , http-types
     , lucid2
     , monad-logger
@@ -87,6 +88,7 @@ executable brossa-perf
     , exceptions
     , formatting
     , hspec-discover
+    , hspec-expectations-lifted
     , http-types
     , lucid2
     , monad-logger
@@ -138,6 +140,7 @@ test-suite spec
     , formatting
     , hspec
     , hspec-discover
+    , hspec-expectations-lifted
     , http-types
     , lucid2
     , monad-logger

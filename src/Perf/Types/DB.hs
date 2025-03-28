@@ -31,6 +31,7 @@ MapBranchCommit
   commitId CommitId
   UniqueMapBranchCommit branchId commitId
   deriving Show
+  deriving Eq
 
 Benchmark
   commitId CommitId
