@@ -10,6 +10,7 @@ build-type:     Simple
 
 library
   exposed-modules:
+      Perf.Import
       Perf.Server
       Perf.Types.DB
       Perf.Types.External
@@ -32,6 +33,7 @@ library
       LambdaCase
       ExplicitNamespaces
       QuasiQuotes
+      TypeFamilies
   build-depends:
       aeson
     , base
@@ -40,8 +42,10 @@ library
     , exceptions
     , formatting
     , hspec-discover
+    , hspec-expectations-lifted
     , http-types
     , lucid2
+    , monad-logger
     , persistent
     , persistent-sqlite
     , persistent-template
@@ -73,6 +77,7 @@ executable brossa-perf
       LambdaCase
       ExplicitNamespaces
       QuasiQuotes
+      TypeFamilies
   ghc-options: -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       aeson
@@ -83,8 +88,10 @@ executable brossa-perf
     , exceptions
     , formatting
     , hspec-discover
+    , hspec-expectations-lifted
     , http-types
     , lucid2
+    , monad-logger
     , persistent
     , persistent-sqlite
     , persistent-template
@@ -101,6 +108,7 @@ test-suite spec
   type: exitcode-stdio-1.0
   main-is: Spec.hs
   other-modules:
+      Perf.ImportSpec
       Perf.Types.ExternalSpec
       Paths_brossa_perf
   hs-source-dirs:
@@ -120,6 +128,7 @@ test-suite spec
       LambdaCase
       ExplicitNamespaces
       QuasiQuotes
+      TypeFamilies
   ghc-options: -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       aeson
@@ -131,8 +140,10 @@ test-suite spec
     , formatting
     , hspec
     , hspec-discover
+    , hspec-expectations-lifted
     , http-types
     , lucid2
+    , monad-logger
     , persistent
     , persistent-sqlite
     , persistent-template

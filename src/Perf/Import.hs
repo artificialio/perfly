@@ -1,5 +1,6 @@
 module Perf.Import where
 
+import Control.Monad.Logger
 import Control.Monad
 import Data.Maybe
 import Data.Functor
@@ -9,11 +10,10 @@ import Database.Persist
 import qualified Perf.Types.DB as DB
 import Data.Time
 import Database.Persist.Sqlite
+import Control.Monad.IO.Class
 
-importCommit :: EX.Commit -> IO ()
 importCommit commit = do
-  now <- getCurrentTime
-  runSqlite "..." do
+    now <- liftIO getCurrentTime
     -- Ensure that the branch exists
     Entity branchId _ <- upsert DB.Branch {
        branchName = commit.branch,

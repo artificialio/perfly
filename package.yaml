@@ -16,9 +16,12 @@ default-extensions:
 - LambdaCase
 - ExplicitNamespaces
 - QuasiQuotes
+- TypeFamilies
 
 dependencies:
 - base
+- hspec-expectations-lifted
+- monad-logger
 - bytestring
 - aeson
 - wai
