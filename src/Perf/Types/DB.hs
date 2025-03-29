@@ -12,6 +12,13 @@ import Database.Persist.Sqlite
 import Database.Persist
 import Data.Time (UTCTime)
 import Data.Text (Text)
+import Control.Monad.Trans.Resource
+import Control.Monad.Trans.Reader
+import Control.Monad.Logger
+
+-- I consider this a bit of an anti-pattern, but I don't care enough
+-- to use something like persistent-sql-lifted. It's fine.
+type DB = ReaderT SqlBackend (NoLoggingT (ResourceT IO))
 
 share [mkPersist sqlSettings, mkMigrate "migrateAll"] [persistLowerCase|
 Branch

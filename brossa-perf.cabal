@@ -49,9 +49,11 @@ library
     , persistent
     , persistent-sqlite
     , persistent-template
+    , resourcet
     , rio
     , text
     , time
+    , transformers
     , unliftio
     , wai
     , wai-extra
@@ -95,9 +97,11 @@ executable brossa-perf
     , persistent
     , persistent-sqlite
     , persistent-template
+    , resourcet
     , rio
     , text
     , time
+    , transformers
     , unliftio
     , wai
     , wai-extra
@@ -147,9 +151,11 @@ test-suite spec
     , persistent
     , persistent-sqlite
     , persistent-template
+    , resourcet
     , rio
     , text
     , time
+    , transformers
     , unliftio
     , wai
     , wai-extra

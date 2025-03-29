@@ -1,6 +1,5 @@
 module Perf.Import where
 
-import Control.Monad.Logger
 import Control.Monad
 import Data.Maybe
 import Data.Functor
@@ -12,6 +11,7 @@ import Data.Time
 import Database.Persist.Sqlite
 import Control.Monad.IO.Class
 
+importCommit :: EX.Commit -> DB.DB ()
 importCommit commit = do
     now <- liftIO getCurrentTime
     -- Ensure that the branch exists

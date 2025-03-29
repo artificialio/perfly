@@ -21,6 +21,8 @@ default-extensions:
 dependencies:
 - base
 - hspec-expectations-lifted
+- resourcet
+- transformers
 - monad-logger
 - bytestring
 - aeson
