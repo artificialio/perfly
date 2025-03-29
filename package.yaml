@@ -22,6 +22,7 @@ dependencies:
 - base
 - hspec-expectations-lifted
 - resourcet
+- yesod
 - transformers
 - monad-logger
 - bytestring
@@ -32,6 +33,7 @@ dependencies:
 - warp
 - http-types
 - lucid2
+- mtl
 - time
 - text
 - unliftio
@@ -42,6 +44,10 @@ dependencies:
 - persistent
 - persistent-template
 - hspec-discover
+- containers
+
+ghc-options:
+- -Wall
 
 library:
   source-dirs: src
