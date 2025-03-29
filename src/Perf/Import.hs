@@ -11,6 +11,7 @@ import Data.Time
 import Database.Persist.Sqlite
 import Control.Monad.IO.Class
 
+-- Import from an external commit into the database.
 importCommit :: EX.Commit -> DB.DB ()
 importCommit commit = do
   now <- liftIO getCurrentTime
