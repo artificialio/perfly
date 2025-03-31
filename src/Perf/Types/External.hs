@@ -1,7 +1,7 @@
 module Perf.Types.External where
 
 import GHC.Generics (Generic)
-import Data.Aeson (FromJSON, Value)
+import Data.Aeson (FromJSON)
 import Data.Text (Text)
 
 -- | A commit pushed to us externally.

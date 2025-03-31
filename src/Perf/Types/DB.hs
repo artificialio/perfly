@@ -5,11 +5,8 @@
 
 module Perf.Types.DB where
 
-import Data.Traversable
-import Control.Monad.IO.Class
 import Database.Persist.TH
 import Database.Persist.Sqlite
-import Database.Persist
 import Data.Time (UTCTime)
 import Data.Text (Text)
 import Control.Monad.Trans.Resource

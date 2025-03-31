@@ -2,13 +2,11 @@ module Perf.Import where
 
 import Control.Monad
 import Data.Maybe
-import Data.Functor
 import Data.Foldable
 import qualified Perf.Types.External as EX
 import Database.Persist
 import qualified Perf.Types.DB as DB
 import Data.Time
-import Database.Persist.Sqlite
 import Control.Monad.IO.Class
 
 -- Import from an external commit into the database.
@@ -24,7 +22,7 @@ importCommit commit = do
   mcommit <- fmap listToMaybe $ selectList [DB.CommitHash ==. commit.commit] []
   -- Ensure it does exist.
   commitId <- case mcommit of
-    Just commit -> pure commit.entityKey
+    Just commit' -> pure commit'.entityKey
     Nothing -> insert DB.Commit {
         commitHash = commit.commit,
         commitCreatedAt = now

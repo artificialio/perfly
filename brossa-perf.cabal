@@ -11,9 +11,16 @@ build-type:     Simple
 library
   exposed-modules:
       Perf.Import
-      Perf.Server
       Perf.Types.DB
       Perf.Types.External
+      Perf.Web
+      Perf.Web.Db
+      Perf.Web.Dispatch
+      Perf.Web.Foundation
+      Perf.Web.Layout
+      Perf.Web.Routes
+      Perf.Web.Types
+      Yesod.Lucid
   other-modules:
       Paths_brossa_perf
   hs-source-dirs:
@@ -34,10 +41,12 @@ library
       ExplicitNamespaces
       QuasiQuotes
       TypeFamilies
+  ghc-options: -Wall
   build-depends:
       aeson
     , base
     , bytestring
+    , containers
     , directory
     , exceptions
     , formatting
@@ -46,6 +55,7 @@ library
     , http-types
     , lucid2
     , monad-logger
+    , mtl
     , persistent
     , persistent-sqlite
     , persistent-template
@@ -58,6 +68,7 @@ library
     , wai
     , wai-extra
     , warp
+    , yesod
   default-language: GHC2021
 
 executable brossa-perf
@@ -80,12 +91,13 @@ executable brossa-perf
       ExplicitNamespaces
       QuasiQuotes
       TypeFamilies
-  ghc-options: -threaded -rtsopts -with-rtsopts=-N
+  ghc-options: -Wall -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       aeson
     , base
     , brossa-perf
     , bytestring
+    , containers
     , directory
     , exceptions
     , formatting
@@ -94,6 +106,7 @@ executable brossa-perf
     , http-types
     , lucid2
     , monad-logger
+    , mtl
     , persistent
     , persistent-sqlite
     , persistent-template
@@ -106,6 +119,7 @@ executable brossa-perf
     , wai
     , wai-extra
     , warp
+    , yesod
   default-language: GHC2021
 
 test-suite spec
@@ -133,12 +147,13 @@ test-suite spec
       ExplicitNamespaces
       QuasiQuotes
       TypeFamilies
-  ghc-options: -threaded -rtsopts -with-rtsopts=-N
+  ghc-options: -Wall -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       aeson
     , base
     , brossa-perf
     , bytestring
+    , containers
     , directory
     , exceptions
     , formatting
@@ -148,6 +163,7 @@ test-suite spec
     , http-types
     , lucid2
     , monad-logger
+    , mtl
     , persistent
     , persistent-sqlite
     , persistent-template
@@ -160,4 +176,5 @@ test-suite spec
     , wai
     , wai-extra
     , warp
+    , yesod
   default-language: GHC2021
