@@ -22,15 +22,16 @@ import Yesod hiding (toHtml)
 
 getHomeR :: Handler (Yesod.Lucid.Html ())
 getHomeR = do
-  branches <- db $ selectList @DB.Branch [] []
+  master <- db $ selectList @DB.Branch [DB.BranchName ==. "master"] []
+  branches <- db $ selectList @DB.Branch [DB.BranchName !=. "master"] [Desc DB.BranchCreatedAt]
   lucid do
-    defaultLayout_ do
-      h1_ "All branches"
-      for_ branches \(Entity _ branch) ->
-        div_ do
-          url <- asks (.url)
-          a_ [href_ $ url $ BranchR branch.branchName] $
-           toHtml $ branch.branchName
+    defaultLayout_ "Performance" do
+      ul_ $
+        for_ (master <> branches) \(Entity _ branch) ->
+          li_ do
+            url <- asks (.url)
+            a_ [href_ $ url $ BranchR branch.branchName] $
+             toHtml $ branch.branchName
 
 getBranchR :: Text -> Handler (Yesod.Lucid.Html ())
 getBranchR name = do
@@ -38,17 +39,21 @@ getBranchR name = do
   case mbranch of
     Nothing -> notFound
     Just (Entity branchId branch) -> do
-      mappings <- db $ selectList [DB.MapBranchCommitBranchId ==. branchId] []
+      mappings <- db $ selectList [DB.MapBranchCommitBranchId ==. branchId]
+                                  [Desc DB.MapBranchCommitId]
       commits <- fmap catMaybes $ RIO.for mappings \mapping ->
         db $ selectFirst [DB.CommitId ==. mapping.entityVal.mapBranchCommitCommitId] []
       lucid do
-        defaultLayout_ do
-          h1_ $ toHtml $ branch.branchName
-          for_ commits \(Entity _ commit) ->
-            div_ do
+        defaultLayout_ branch.branchName do
+          table_ $
+            for_ commits \(Entity _ commit) -> do
               url <- asks (.url)
-              a_ [href_ $ url $ BranchCommitR name commit.commitHash] $
-                toHtml $ commit.commitHash
+              tr_ do
+                td_ $
+                  small_ $ toHtml $ show commit.commitCreatedAt
+                td_ $
+                  a_ [href_ $ url $ BranchCommitR name commit.commitHash] $
+                    code_ $ toHtml $ commit.commitHash
 
 getCommitR :: Text -> Handler (Yesod.Lucid.Html ())
 getCommitR hash = do
@@ -56,7 +61,7 @@ getCommitR hash = do
   case mcommit of
     Nothing -> notFound
     Just (Entity commitId commit) -> do
-      benchmarks0 <- db $ selectList [DB.BenchmarkCommitId ==. commitId] []
+      benchmarks0 <- db $ selectList [DB.BenchmarkCommitId ==. commitId] [Desc DB.BenchmarkCommitId]
       benchmarks <- for benchmarks0 \(Entity benchmarkId benchmark) -> do
         tests0 <- db $ selectList [DB.TestBenchmarkId ==. benchmarkId] []
         tests <- for tests0 \(Entity testId _) -> do
@@ -65,9 +70,7 @@ getCommitR hash = do
           pure (factors, metrics)
         pure (benchmark, tests)
       lucid do
-        defaultLayout_ do
-          h1_ $
-            toHtml $ commit.commitHash
+        defaultLayout_ commit.commitHash do
           generateTable benchmarks
 
 generateTable :: [(DB.Benchmark, [([Entity DB.Factor], [Entity DB.Metric])])] -> HtmlT (Reader (Page App)) ()

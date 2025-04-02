@@ -21,7 +21,7 @@ instance YesodBreadcrumbs App where
   breadcrumb r =
     case r of
       HomeR -> return ("Home",Nothing)
-      BranchR name -> return (name, Nothing)
-      CommitR hash -> return (hash, Nothing)
+      BranchR name -> return (name, Just HomeR)
+      CommitR hash -> return (hash, Just HomeR)
       BranchCommitR branch commit -> return (commit, Just $ BranchR branch)
       ReceiverR -> return ("Webhook Receiver", Nothing)
