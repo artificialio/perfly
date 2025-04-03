@@ -14,3 +14,6 @@ newtype Hash = Hash Text
 
 newtype MetricLabel = MetricLabel Text
   deriving newtype (Show, Eq, Ord, PersistField, PersistFieldSql, IsString, Read, ToHtml, PathPiece)
+
+data GeneralFactor = GeneralFactor { name :: Text, value :: Text }
+  deriving (Eq, Ord, Show)

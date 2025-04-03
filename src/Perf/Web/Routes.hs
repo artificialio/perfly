@@ -1,5 +1,6 @@
 module Perf.Web.Routes where
 
+import qualified Data.List.NonEmpty as NonEmpty
 import Lucid.Base
 import qualified Data.List as List
 import Data.Set (Set)
@@ -72,10 +73,22 @@ getCommitR hash = do
         defaultLayout_ (coerce commit.entityVal.commitHash) do
           generateTable generateSingleMetric benchmarks
 
+getCompareCommitsR :: Prim.Hash ->  Prim.Hash -> Handler (Html ())
+getCompareCommitsR before after = do
+  mhash0 <- db $ selectFirst [DB.CommitHash ==. before] []
+  mhash1 <- db $ selectFirst [DB.CommitHash ==. after] []
+  case (,) <$> mhash0 <*> mhash1 of
+    Nothing -> notFound
+    Just (hash0,hash1) -> do
+      benchmarks <- db $ materializeCommits $ hash0 NonEmpty.:| [hash1]
+      lucid do
+        defaultLayout_ "Compare commits" do
+          generateTable generatePluralMetric benchmarks
+
 generateTable ::
   (metric -> Html ()) ->
   (Map Prim.SubjectName
-      (Map (Set DB.Factor)
+      (Map (Set Prim.GeneralFactor)
         (Map Prim.MetricLabel
            metric)))
  -> HtmlT (Reader (Page App)) ()
@@ -99,8 +112,8 @@ generateTable generateMetric benchmarks =
             tr_ do
               td_ do
                 forM_ factors $ \factor -> do
-                  let factorName = factor.factorName
-                  let factorValue = factor.factorValue
+                  let factorName = factor.name
+                  let factorValue = factor.value
                   div_ $ toHtml $ T.concat [T.strip factorName, "=", T.strip factorValue]
               forM_ metrics $ generalizeHtmlT . generateMetric
 
@@ -123,7 +136,30 @@ generateSingleMetric (_, metric) = do
       ]
 
 generatePluralMetric :: Map DB.Commit DB.Metric -> Html ()
-generatePluralMetric _ = pure ()
+generatePluralMetric metrics = do
+  td_ do
+    div_ do
+      strong_ $ property "mean" (.metricMean)
+      " ("
+      property "stddev" (.metricStddev)
+      ", "
+      property "min" (.metricRangeLower)
+      ", "
+      property "max" (.metricRangeUpper)
+      ")"
+  where
+    colors = ["green", "blue", "purple"]
+    colorize color s = span_ [style_ ("color: " <> color)] s
+    property label accessor = do
+      label
+      ":"
+      sequence_ $
+        List.intersperse "-" $
+        zipWith colorize (cycle colors) $
+        map (toHtml . shortNum . accessor) $
+        Map.elems metrics
+      "="
+      colorize "red" $ toHtml $ shortNum $ foldl1 (-) $ map accessor $ Map.elems metrics
 
 shortNum :: Double -> Text
 shortNum = T.pack . printf @(Double -> String) "%.3f"

@@ -30,6 +30,8 @@ Commit
   createdAt UTCTime
   UniqueCommit hash
   deriving Show
+  deriving Eq
+  deriving Ord
 
 MapBranchCommit
   branchId BranchId

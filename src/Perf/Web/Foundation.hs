@@ -4,6 +4,7 @@ module Perf.Web.Foundation where
 
 import Data.Coerce
 import Data.Text (Text)
+import qualified Data.Text as T
 import Yesod
 import Perf.Types.Web
 import Perf.Types.Prim
@@ -13,6 +14,7 @@ mkYesodData "App" [parseRoutes|
   /branch/#Text BranchR GET
   /branch/#Text/#Hash BranchCommitR GET
   /commit/#Hash CommitR GET
+  /compare/#Hash/#Hash CompareCommitsR GET
   /hooks/update ReceiverR POST
 |]
 
@@ -25,5 +27,8 @@ instance YesodBreadcrumbs App where
       HomeR -> return ("Home",Nothing)
       BranchR name -> return (name, Just HomeR)
       CommitR hash -> return (coerce hash, Just HomeR)
+      CompareCommitsR hash0 hash1 ->
+        let short x = T.take 8 $ coerce x
+        in return ("Compare " <> short hash0 <> " .. " <> short hash1, Just HomeR)
       BranchCommitR branch commit -> return (coerce commit, Just $ BranchR branch)
       ReceiverR -> return ("Webhook Receiver", Nothing)

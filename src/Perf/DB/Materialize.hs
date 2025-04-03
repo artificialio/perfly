@@ -17,13 +17,13 @@ materializeCommits ::
   NonEmpty (Entity DB.Commit) ->
   DB.DB
     (Map Prim.SubjectName
-      (Map (Set DB.Factor)
+      (Map (Set Prim.GeneralFactor)
         (Map Prim.MetricLabel
            (Map DB.Commit DB.Metric))))
 materializeCommits commits = do
   benchmarks <- traverse materializeCommit commits
   pure $
-    List.foldl1' (Map.intersectionWith Map.union) $
+    List.foldl1' (Map.intersectionWith (Map.unionWith (Map.unionWith Map.union))) $
     NonEmpty.toList $
     fmap (fmap (fmap (fmap (\(commit, metric) -> Map.singleton commit metric)))) $
     benchmarks
@@ -33,7 +33,7 @@ materializeCommit ::
   Entity DB.Commit ->
   DB.DB
     (Map Prim.SubjectName
-      (Map (Set DB.Factor)
+      (Map (Set Prim.GeneralFactor)
         (Map Prim.MetricLabel
            (DB.Commit, DB.Metric))))
 materializeCommit commit = do
@@ -43,7 +43,10 @@ materializeCommit commit = do
     tests <- for tests0 \(Entity testId _) -> do
       factors <- selectList [DB.FactorTestId ==. testId] []
       metrics <- selectList [DB.MetricTestId ==. testId] []
-      pure (map (.entityVal) factors, map (.entityVal) metrics)
+      pure (map (\factor -> Prim.GeneralFactor factor.entityVal.factorName
+                                               factor.entityVal.factorValue)
+                factors,
+            map (.entityVal) metrics)
     pure (benchmark, tests)
   pure $ Map.fromList $
     flip map benchmarks \(benchmark, tests) ->
