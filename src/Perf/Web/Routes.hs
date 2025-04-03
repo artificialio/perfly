@@ -1,5 +1,6 @@
 module Perf.Web.Routes where
 
+import Data.Coerce
 import Text.Printf
 import qualified Data.Containers.ListUtils as List
 import qualified Data.List as List
@@ -10,10 +11,11 @@ import Yesod.Lucid
 import Data.Maybe
 import Perf.Web.Db
 import Perf.Web.Foundation
-import Perf.Web.Types
+import Perf.Types.Web
 import Data.Text (Text)
 import qualified Perf.Types.DB as DB
 import qualified Perf.Types.External as EX
+import qualified Perf.Types.Prim as Prim
 import Perf.DB.Import
 import Database.Persist.Sqlite
 import RIO qualified
@@ -55,7 +57,7 @@ getBranchR name = do
                   a_ [href_ $ url $ BranchCommitR name commit.commitHash] $
                     code_ $ toHtml $ commit.commitHash
 
-getCommitR :: Text -> Handler (Yesod.Lucid.Html ())
+getCommitR :: Prim.Hash -> Handler (Yesod.Lucid.Html ())
 getCommitR hash = do
   mcommit <- db $ selectFirst [DB.CommitHash ==. hash] []
   case mcommit of
@@ -70,7 +72,7 @@ getCommitR hash = do
           pure (factors, metrics)
         pure (benchmark, tests)
       lucid do
-        defaultLayout_ commit.commitHash do
+        defaultLayout_ (coerce commit.commitHash) do
           generateTable benchmarks
 
 generateTable :: [(DB.Benchmark, [([Entity DB.Factor], [Entity DB.Metric])])] -> HtmlT (Reader (Page App)) ()
@@ -118,7 +120,7 @@ generateTable benchmarks =
 shortNum :: Double -> Text
 shortNum = T.pack . printf @(Double -> String) "%.3f"
 
-getBranchCommitR :: Text -> Text -> Handler (Yesod.Lucid.Html ())
+getBranchCommitR :: Text -> Prim.Hash -> Handler (Yesod.Lucid.Html ())
 getBranchCommitR branch hash = do
   mbranch <- db $ selectFirst [DB.BranchName ==. branch] []
   case mbranch of

@@ -4,7 +4,7 @@ import qualified UnliftIO
 import qualified Perf.Types.DB as DB
 import Database.Persist.Sqlite
 import Yesod
-import Perf.Web.Types
+import Perf.Types.Web
 import Perf.Web.Foundation
 
 db :: DB.DB a -> Handler a

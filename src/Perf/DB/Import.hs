@@ -6,6 +6,7 @@ import Data.Foldable
 import qualified Perf.Types.External as EX
 import Database.Persist
 import qualified Perf.Types.DB as DB
+import qualified Perf.Types.Prim as Prim
 import Data.Time
 import Control.Monad.IO.Class
 
@@ -19,12 +20,12 @@ importCommit commit = do
      branchCreatedAt = now
    } []
   -- Check whether the commit already exists.
-  mcommit <- fmap listToMaybe $ selectList [DB.CommitHash ==. commit.commit] []
+  mcommit <- fmap listToMaybe $ selectList [DB.CommitHash ==. Prim.Hash commit.commit] []
   -- Ensure it does exist.
   commitId <- case mcommit of
     Just commit' -> pure commit'.entityKey
     Nothing -> insert DB.Commit {
-        commitHash = commit.commit,
+        commitHash = Prim.Hash commit.commit,
         commitCreatedAt = now
       }
   -- Add the commit to the branch if needed.
@@ -39,7 +40,7 @@ importCommit commit = do
     for_ commit.result.benchmarks \benchmark -> do
       benchmarkId <- insert DB.Benchmark {
           benchmarkCommitId = commitId,
-          benchmarkSubject = benchmark.subject
+          benchmarkSubject = Prim.SubjectName benchmark.subject
         }
       for_ benchmark.tests \test -> do
         testId <- insert DB.Test {
@@ -53,7 +54,7 @@ importCommit commit = do
           }
         for_ test.metrics \metric ->
           insert_ DB.Metric { metricTestId = testId,
-            metricName = metric.metric,
+            metricName = Prim.MetricLabel metric.metric,
                metricRangeLower = metric.rangeLower,
                metricRangeUpper = metric.rangeUpper,
                metricMean = metric.mean,

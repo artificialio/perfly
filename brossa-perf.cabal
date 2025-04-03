@@ -13,13 +13,14 @@ library
       Perf.DB.Import
       Perf.Types.DB
       Perf.Types.External
+      Perf.Types.Prim
+      Perf.Types.Web
       Perf.Web
       Perf.Web.Db
       Perf.Web.Dispatch
       Perf.Web.Foundation
       Perf.Web.Layout
       Perf.Web.Routes
-      Perf.Web.Types
       Yesod.Lucid
   other-modules:
       Paths_brossa_perf

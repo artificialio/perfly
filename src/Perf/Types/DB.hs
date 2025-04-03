@@ -5,6 +5,7 @@
 
 module Perf.Types.DB where
 
+import Perf.Types.Prim
 import Database.Persist.TH
 import Database.Persist.Sqlite
 import Data.Time (UTCTime)
@@ -25,7 +26,7 @@ Branch
   deriving Show
 
 Commit
-  hash Text
+  hash Hash
   createdAt UTCTime
   UniqueCommit hash
   deriving Show
@@ -39,7 +40,7 @@ MapBranchCommit
 
 Benchmark
   commitId CommitId
-  subject Text
+  subject SubjectName
   deriving Show
 
 Test
@@ -51,10 +52,12 @@ Factor
   name Text
   value Text
   deriving Show
+  deriving Eq
+  deriving Ord
 
 Metric
   testId TestId
-  name Text
+  name MetricLabel
   rangeLower Double
   rangeUpper Double
   mean Double

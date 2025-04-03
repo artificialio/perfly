@@ -7,7 +7,7 @@ import System.Environment
 import qualified Data.Text as T
 import Database.Persist.Sqlite
 import Perf.Web.Dispatch ()
-import Perf.Web.Types
+import Perf.Types.Web
 import RIO qualified
 import Yesod (warpEnv)
 import qualified Perf.Types.DB as DB

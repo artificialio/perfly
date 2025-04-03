@@ -3,7 +3,7 @@ module Perf.Web.Layout where
 import qualified Data.List as List
 import Data.Text (Text)
 import Yesod.Lucid
-import Perf.Web.Types
+import Perf.Types.Web
 
 defaultLayout_ :: Text -> HtmlT (Reader (Page App)) a -> HtmlT (Reader (Page App)) a
 defaultLayout_ title body = do

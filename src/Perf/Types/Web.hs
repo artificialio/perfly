@@ -1,4 +1,4 @@
-module Perf.Web.Types where
+module Perf.Types.Web where
 
 import Data.Text (Text)
 import RIO qualified
