@@ -10,7 +10,7 @@ build-type:     Simple
 
 library
   exposed-modules:
-      Perf.Import
+      Perf.DB.Import
       Perf.Types.DB
       Perf.Types.External
       Perf.Web

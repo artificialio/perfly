@@ -2,7 +2,7 @@ module Perf.ImportSpec where
 
 import Data.Functor
 import Test.Hspec.Expectations.Lifted
-import Perf.Import
+import Perf.DB.Import
 import Test.Hspec (Spec, it)
 import qualified Perf.Types.External as EX
 import qualified Perf.Types.DB as DB

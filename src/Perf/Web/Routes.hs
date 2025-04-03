@@ -14,7 +14,7 @@ import Perf.Web.Types
 import Data.Text (Text)
 import qualified Perf.Types.DB as DB
 import qualified Perf.Types.External as EX
-import Perf.Import
+import Perf.DB.Import
 import Database.Persist.Sqlite
 import RIO qualified
 import Data.Foldable

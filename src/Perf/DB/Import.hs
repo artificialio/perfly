@@ -1,4 +1,4 @@
-module Perf.Import where
+module Perf.DB.Import where
 
 import Control.Monad
 import Data.Maybe
