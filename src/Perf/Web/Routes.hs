@@ -54,7 +54,7 @@ getBranchR name = do
                                   [Desc DB.MapBranchCommitId]
       commits <- fmap catMaybes $ RIO.for mappings \mapping ->
         db $ selectFirst [DB.CommitId ==. mapping.entityVal.mapBranchCommitCommitId] []
-      mbenchmarks <- db $ for (NonEmpty.nonEmpty $ take 28 commits) materializeCommits
+      mbenchmarks <- db $ for (NonEmpty.nonEmpty $ reverse $ take 28 $ commits) materializeCommits
       lucid do
         defaultLayout_ branch.branchName do
           for_ mbenchmarks $ generalizeHtmlT . generatePlots

@@ -31,7 +31,6 @@ Commit
   UniqueCommit hash
   deriving Show
   deriving Eq
-  deriving Ord
 
 MapBranchCommit
   branchId BranchId
@@ -66,3 +65,9 @@ Metric
   stddev Double
   deriving Show
 |]
+
+instance Ord Commit where
+  compare c1 c2 =
+   compare c1.commitCreatedAt c2.commitCreatedAt
+   `mappend`
+   compare c1.commitHash c2.commitHash
