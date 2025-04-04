@@ -11,11 +11,13 @@ build-type:     Simple
 library
   exposed-modules:
       Perf.DB.Import
+      Perf.DB.Materialize
       Perf.Types.DB
       Perf.Types.External
       Perf.Types.Prim
       Perf.Types.Web
       Perf.Web
+      Perf.Web.Chart
       Perf.Web.Db
       Perf.Web.Dispatch
       Perf.Web.Foundation
@@ -29,7 +31,6 @@ library
   default-extensions:
       BlockArguments
       OverloadedStrings
-      OverloadedLists
       DuplicateRecordFields
       NamedFieldPuns
       DeriveGeneric
@@ -79,7 +80,6 @@ executable brossa-perf
   default-extensions:
       BlockArguments
       OverloadedStrings
-      OverloadedLists
       DuplicateRecordFields
       NamedFieldPuns
       DeriveGeneric
@@ -135,7 +135,6 @@ test-suite spec
   default-extensions:
       BlockArguments
       OverloadedStrings
-      OverloadedLists
       DuplicateRecordFields
       NamedFieldPuns
       DeriveGeneric

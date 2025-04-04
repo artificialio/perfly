@@ -4,7 +4,6 @@ language: GHC2021
 default-extensions:
 - BlockArguments
 - OverloadedStrings
-- OverloadedLists
 - DuplicateRecordFields
 - NamedFieldPuns
 - DeriveGeneric

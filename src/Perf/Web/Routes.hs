@@ -1,11 +1,15 @@
 module Perf.Web.Routes where
 
+import Data.Bifunctor
+import Perf.Web.Chart
+import Data.Traversable
 import qualified Data.List.NonEmpty as NonEmpty
 import Lucid.Base
 import qualified Data.List as List
 import Data.Set (Set)
 import Data.Map (Map)
 import qualified Data.Map as Map
+import qualified Data.Set as Set
 import qualified Perf.Types.Prim as Prim
 import Database.Persist
 import qualified Perf.Types.DB as DB
@@ -50,8 +54,11 @@ getBranchR name = do
                                   [Desc DB.MapBranchCommitId]
       commits <- fmap catMaybes $ RIO.for mappings \mapping ->
         db $ selectFirst [DB.CommitId ==. mapping.entityVal.mapBranchCommitCommitId] []
+      mbenchmarks <- db $ for (NonEmpty.nonEmpty $ take 28 commits) materializeCommits
       lucid do
         defaultLayout_ branch.branchName do
+          for_ mbenchmarks $ generalizeHtmlT . generatePlots
+          h1_ "Commits"
           table_ do
             let prevCommits = map Just (drop 1 commits) <> repeat Nothing
             for_ (zip commits prevCommits) \(Entity _ commit, mprev) -> do
@@ -69,6 +76,96 @@ getBranchR name = do
                           CompareCommitsR previous.commitHash commit.commitHash] $
                       "compare previous"
 
+factorSmall :: Prim.GeneralFactor -> Text
+factorSmall factor = T.concat [T.strip factor.name, "=", T.strip factor.value]
+
+factorsSmall :: Set Prim.GeneralFactor -> Text
+factorsSmall = T.intercalate "," . map factorSmall . toList
+
+generatePlots ::
+  (Map Prim.SubjectName
+      (Map (Set Prim.GeneralFactor)
+        (Map Prim.MetricLabel
+           (Map DB.Commit DB.Metric))))
+  -> Html ()
+generatePlots benchmarks = do
+  unless (Map.null benchmarks) $ h1_ "Plots"
+  for_ (zip [0 :: Int ..] (Map.toList benchmarks)) \(b_i,(subject, tests)) -> do
+    h2_ $ toHtml subject
+    let labels :: Set DB.Commit =
+          Set.fromList $ concatMap (concatMap Map.keys . Map.elems) $ Map.elems tests
+    let metrics :: Set Prim.MetricLabel =
+          Set.fromList $ concatMap Map.keys $ Map.elems tests
+    -- Produce a chart for each type of metric.
+    div_ [style_ "display: flex;"] do
+      for_ (zip [0 :: Int ..] (toList metrics)) \(m_i, metricLabel) -> do
+        let dataSets =
+              map (second (maybe [] Map.elems . Map.lookup metricLabel))
+              $ Map.toList tests
+        chart_ (T.pack (show b_i) <> "-" <> T.pack (show m_i)) $
+          makeChartConfig metricLabel labels dataSets
+
+makeChartConfig ::
+  Prim.MetricLabel ->
+  Set DB.Commit ->
+  [(Set Prim.GeneralFactor, [DB.Metric])] ->
+  Value
+makeChartConfig metricName commits dataSets =
+  object
+  [ "type" .= ("line" :: Text)
+  , "data" .= chartData
+  , "options" .= object
+      [ "responsive" .= True
+      , "maintainAspectRatio" .= False
+      , "animations" .= False
+      , "plugins" .= object
+          [ "title" .= object
+              [ "display" .= True
+              , "text" .= coerce @_ @Text metricName
+              , "font" .= object
+                  [ "size" .= (16 :: Int)
+                  ]
+              ]
+          , "tooltip" .= object
+              [ "callbacks" .= object
+                  [ "title" .= ("function(tooltipItems) { return 'Commit: ' + tooltipItems[0].label; }" :: Text)
+                  ]
+              ]
+          ]
+      , "scales" .= object
+          [ "x" .= object
+              [ "title" .= object
+                  [ "display" .= False
+                  , "text" .= ("Commits" :: Text)
+                  ]
+              ]
+          , "y" .= object
+              [ "title" .= object
+                  [ "display" .= True
+                  , "text" .= coerce @_ @Text metricName
+                  ]
+              , "beginAtZero" .= True
+              ]
+          ]
+      ]
+  ]
+
+  where
+    chartData = object
+      [ "labels" .= List.map (T.take 8 . (coerce :: Prim.Hash -> Text) . (.commitHash)) (Set.toList commits)
+      , "datasets" .=
+          [ object
+              [ "label" .= factorsSmall factors
+              , "data" .= (map (.metricMean) metrics :: [Double])
+              , "borderColor" .= color
+              , "tension" .= (0.1 :: Double)
+              , "fill" .= False
+              ]
+          | ((factors, metrics), color) <- zip dataSets $ cycle colors
+          ]
+      ]
+    colors :: [Text] = T.words
+      "#4394E5 #87BB62 #876FD4 #F5921B"
 
 getCommitR :: Prim.Hash -> Handler (Html ())
 getCommitR hash = do
