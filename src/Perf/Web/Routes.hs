@@ -142,7 +142,6 @@ generatePluralMetric metrics = do
       property "max" (.metricRangeUpper)
       ")"
   where
-    colors = ["green", "blue", "purple"]
     colorize color s = span_ [style_ ("color: " <> color)] s
     property label accessor = do
       label
@@ -151,7 +150,6 @@ generatePluralMetric metrics = do
       if Map.size metrics > 1 && diff /= 0 then do
         sequence_ $
           List.intersperse "-" $
-          zipWith colorize (cycle colors) $
           map (shortNum . accessor) $
           Map.elems metrics
         "="
