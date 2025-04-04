@@ -152,17 +152,21 @@ generatePluralMetric metrics = do
         sequence_ $
           List.intersperse "-" $
           zipWith colorize (cycle colors) $
-          map (toHtml . shortNum . accessor) $
+          map (shortNum . accessor) $
           Map.elems metrics
         "="
-        colorize "red" $ toHtml $ shortNum $ diff
+        colorize "red" $ shortNum $ diff
       else
         sequence_ $
-          map (toHtml . shortNum . accessor) $
+          map (shortNum . accessor) $
           take 1 $ Map.elems metrics
 
-shortNum :: Double -> Text
-shortNum = T.pack . printf @(Double -> String) "%.3f"
+shortNum :: Double -> Html ()
+shortNum =
+  span_ [style_ "font-family: monospace"] .
+  toHtml .
+  T.pack .
+  printf @(Double -> String) "%.3f"
 
 getBranchCommitR :: Text -> Prim.Hash -> Handler (Html ())
 getBranchCommitR branch hash = do
