@@ -52,8 +52,10 @@ getBranchR name = do
         db $ selectFirst [DB.CommitId ==. mapping.entityVal.mapBranchCommitCommitId] []
       lucid do
         defaultLayout_ branch.branchName do
-          table_ $
-            for_ commits \(Entity _ commit) -> do
+          table_ do
+            let prevCommits = map Just (drop 1 commits) <> repeat Nothing
+            for_ (zip commits prevCommits) \(Entity _ commit, mprev) -> do
+              let mprevious = fmap (.entityVal) mprev
               url <- asks (.url)
               tr_ do
                 td_ $
@@ -61,6 +63,12 @@ getBranchR name = do
                 td_ $
                   a_ [href_ $ url $ BranchCommitR name commit.commitHash] $
                     code_ $ toHtml $ commit.commitHash
+                td_ $
+                  for_ mprevious \previous ->
+                    a_ [href_ $ url $
+                          CompareCommitsR previous.commitHash commit.commitHash] $
+                      "compare previous"
+
 
 getCommitR :: Prim.Hash -> Handler (Html ())
 getCommitR hash = do
@@ -118,22 +126,8 @@ generateTable generateMetric benchmarks =
               forM_ metrics $ generalizeHtmlT . generateMetric
 
 generateSingleMetric :: (DB.Commit, DB.Metric) -> Html ()
-generateSingleMetric (_, metric) = do
-  let mean = metric.metricMean
-  let stddev = metric.metricStddev
-  let rangeUpper = metric.metricRangeUpper
-  let rangeLower = metric.metricRangeLower
-  td_ do
-    div_ do
-      "mean="
-      strong_ $ toHtml $ shortNum mean
-    div_ $ toHtml $ T.concat [
-      "(stddev=", shortNum stddev,
-      ", min..max=",
-      shortNum rangeLower, "..",
-      shortNum rangeUpper,
-      ")"
-      ]
+generateSingleMetric (commit, metric) =
+  generatePluralMetric $ Map.singleton commit metric
 
 generatePluralMetric :: Map DB.Commit DB.Metric -> Html ()
 generatePluralMetric metrics = do
@@ -153,13 +147,19 @@ generatePluralMetric metrics = do
     property label accessor = do
       label
       ":"
-      sequence_ $
-        List.intersperse "-" $
-        zipWith colorize (cycle colors) $
-        map (toHtml . shortNum . accessor) $
-        Map.elems metrics
-      "="
-      colorize "red" $ toHtml $ shortNum $ foldl1 (-) $ map accessor $ Map.elems metrics
+      let diff = foldl1 (-) $ map accessor $ Map.elems metrics
+      if Map.size metrics > 1 && diff /= 0 then do
+        sequence_ $
+          List.intersperse "-" $
+          zipWith colorize (cycle colors) $
+          map (toHtml . shortNum . accessor) $
+          Map.elems metrics
+        "="
+        colorize "red" $ toHtml $ shortNum $ diff
+      else
+        sequence_ $
+          map (toHtml . shortNum . accessor) $
+          take 1 $ Map.elems metrics
 
 shortNum :: Double -> Text
 shortNum = T.pack . printf @(Double -> String) "%.3f"
