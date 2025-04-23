@@ -50,11 +50,12 @@ getBranchR name = do
   case mbranch of
     Nothing -> notFound
     Just (Entity branchId branch) -> do
+      let maxGraph :: Int = 28
       mappings <- db $ selectList [DB.MapBranchCommitBranchId ==. branchId]
-                                  [Desc DB.MapBranchCommitId]
+                                  [Desc DB.MapBranchCommitId, LimitTo maxGraph]
       commits <- fmap catMaybes $ RIO.for mappings \mapping ->
         db $ selectFirst [DB.CommitId ==. mapping.entityVal.mapBranchCommitCommitId] []
-      mbenchmarks <- db $ for (NonEmpty.nonEmpty $ reverse $ take 28 $ commits) materializeCommits
+      mbenchmarks <- db $ for (NonEmpty.nonEmpty $ reverse commits) materializeCommits
       lucid do
         defaultLayout_ branch.branchName do
           for_ mbenchmarks $ generalizeHtmlT . generatePlots
@@ -75,6 +76,10 @@ getBranchR name = do
                     a_ [href_ $ url $
                           CompareCommitsR previous.commitHash commit.commitHash] $
                       "compare previous"
+          p_ $ small_ do
+            "(limited to most recent "
+            toHtml $ show maxGraph
+            " commits)"
 
 factorSmall :: Prim.GeneralFactor -> Text
 factorSmall factor = T.concat [T.strip factor.name, "=", T.strip factor.value]
