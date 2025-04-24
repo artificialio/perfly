@@ -102,7 +102,7 @@ generatePlots benchmarks = do
     let metrics :: Set Prim.MetricLabel =
           Set.fromList $ concatMap Map.keys $ Map.elems tests
     -- Produce a chart for each type of metric.
-    div_ [style_ "display: flex;"] do
+    div_ [style_ "display: flex; flex-wrap: wrap;"] do
       for_ (zip [0 :: Int ..] (toList metrics)) \(m_i, metricLabel) -> do
         let dataSets =
               map (second (maybe [] Map.elems . Map.lookup metricLabel))
