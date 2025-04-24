@@ -161,7 +161,7 @@ makeChartConfig metricName commits dataSets =
       , "datasets" .=
           [ object
               [ "label" .= factorsSmall factors
-              , "data" .= (map (.metricMean) metrics :: [Double])
+              , "data" .= fillLeft (Set.size commits) Null (map (toJSON . (.metricMean)) metrics :: [Value])
               , "borderColor" .= color
               , "tension" .= (0.1 :: Double)
               , "fill" .= False
@@ -171,6 +171,9 @@ makeChartConfig metricName commits dataSets =
       ]
     colors :: [Text] = T.words
       "#4394E5 #87BB62 #876FD4 #F5921B"
+
+fillLeft :: Int -> a -> [a] -> [a]
+fillLeft n x xs = replicate (n - length xs) x <> xs
 
 getCommitR :: Prim.Hash -> Handler (Html ())
 getCommitR hash = do
