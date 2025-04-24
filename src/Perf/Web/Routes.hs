@@ -224,7 +224,7 @@ generateTable generateMetric benchmarks =
           tbody_ do
             forM_ (Map.toList tests) $ \(factors, metrics) -> do
               tr_ do
-                td_ do
+                td_ [style_ "vertical-align: top;"] do
                   forM_ factors $ \factor -> do
                     let factorName = factor.name
                     let factorValue = factor.value
