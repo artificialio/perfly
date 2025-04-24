@@ -11,7 +11,7 @@ defaultLayout_ title body = do
   doctypehtml_ do
     head_ do
       title_ $ toHtml title
-      style_ "body {font-family: sans-serif; margin: 0 auto; max-width: 800px;}"
+      style_ "body {font-family: monospace; margin: 0 auto; max-width: 800px;}"
       script_ [
         src_ "https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js",
         integrity_ "CQBWl4fJHWbryGE+Pc7UAxWMUMNMWzWxF4SQo9CgkJIN1kx6djDQZjh3Y8SZ1d+6I+1zze6Z7kHXO7q3UyZAWw==",
