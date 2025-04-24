@@ -17,6 +17,8 @@ defaultLayout_ title body = do
         integrity_ "CQBWl4fJHWbryGE+Pc7UAxWMUMNMWzWxF4SQo9CgkJIN1kx6djDQZjh3Y8SZ1d+6I+1zze6Z7kHXO7q3UyZAWw==",
         crossorigin_ "anonymous",
         makeAttributes "referrerpolicy" "no-referrer"] (mempty :: Text)
+      script_ [type_ "text/javascript"] $ do 
+        toHtmlRaw ("Chart.defaults.font.family = 'monospace';" :: Text)
     body_ do
       h1_ $ toHtml title
       crumbs <- asks (.crumbs)
