@@ -232,35 +232,38 @@ generateSingleMetric :: (DB.Commit, DB.Metric) -> Html ()
 generateSingleMetric (commit, metric) =
   generatePluralMetric $ Map.singleton commit metric
 
+data MetricStyle = Bold | Small
+
 generatePluralMetric :: Map DB.Commit DB.Metric -> Html ()
 generatePluralMetric metrics = do
   td_ do
     div_ do
-      strong_ $ property "mean" (.metricMean)
-      " ("
-      property "stddev" (.metricStddev)
-      ", "
-      property "min" (.metricRangeLower)
-      ", "
-      property "max" (.metricRangeUpper)
-      ")"
+      table_ $ do
+        property Bold "mean" (.metricMean)
+        property Small "stddev" (.metricStddev)
+        property Small "min" (.metricRangeLower)
+        property Small "max" (.metricRangeUpper)
   where
     colorize color s = span_ [style_ ("color: " <> color)] s
-    property label accessor = do
-      label
-      ":"
-      let diff = foldl1 (-) $ map accessor $ Map.elems metrics
-      if Map.size metrics > 1 && diff /= 0 then do
-        sequence_ $
-          List.intersperse "-" $
-          map (shortNum . accessor) $
-          Map.elems metrics
-        "="
-        colorize "red" $ shortNum $ diff
-      else
-        sequence_ $
-          map (shortNum . accessor) $
-          take 1 $ Map.elems metrics
+    property style label accessor = do
+      let textWrapper = case style of 
+           Bold -> strong_ 
+           Small -> small_
+      tr_ $ do 
+           td_ $ textWrapper $ em_ label 
+           td_$ textWrapper $ do 
+		let diff = foldl1 (-) $ map accessor $ Map.elems metrics
+		if Map.size metrics > 1 && diff /= 0 then do
+			sequence_ $
+			  List.intersperse "-" $
+			  map (shortNum . accessor) $
+			  Map.elems metrics
+			"="
+			colorize "red" $ shortNum $ diff
+		else
+			sequence_ $
+			  map (shortNum . accessor) $
+			  take 1 $ Map.elems metrics
 
 shortNum :: Double -> Html ()
 shortNum =
