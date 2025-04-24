@@ -206,26 +206,27 @@ generateTable generateMetric benchmarks =
   div_ do
     forM_ (Map.toList benchmarks) $ \(subject, tests) -> do
       h3_ $ toHtml subject
-      table_ do
-        thead_ do
-          tr_ do
-            th_ "Factor"
-            let headings =
-                  List.nubOrd $
-                  List.concatMap
-                    (\(_factors, metrics) -> Map.keys metrics)
-                    $ Map.toList tests
-            for_ headings $ \factor ->
-               th_ $ toHtml factor
-        tbody_ do
-          forM_ (Map.toList tests) $ \(factors, metrics) -> do
+      div_ [style_ "overflow-x: scroll;"] do 
+        table_ do
+          thead_ do
             tr_ do
-              td_ do
-                forM_ factors $ \factor -> do
-                  let factorName = factor.name
-                  let factorValue = factor.value
-                  div_ $ toHtml $ T.concat [T.strip factorName, "=", T.strip factorValue]
-              forM_ metrics $ generalizeHtmlT . generateMetric
+              th_ "Factor"
+              let headings =
+                    List.nubOrd $
+                    List.concatMap
+                      (\(_factors, metrics) -> Map.keys metrics)
+                      $ Map.toList tests
+              for_ headings $ \factor ->
+                 th_ $ toHtml factor
+          tbody_ do
+            forM_ (Map.toList tests) $ \(factors, metrics) -> do
+              tr_ do
+                td_ do
+                  forM_ factors $ \factor -> do
+                    let factorName = factor.name
+                    let factorValue = factor.value
+                    div_ $ toHtml $ T.concat [T.strip factorName, "=", T.strip factorValue]
+                forM_ metrics $ generalizeHtmlT . generateMetric
 
 generateSingleMetric :: (DB.Commit, DB.Metric) -> Html ()
 generateSingleMetric (commit, metric) =
