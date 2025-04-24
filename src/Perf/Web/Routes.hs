@@ -210,7 +210,7 @@ generateTable generateMetric benchmarks =
     forM_ (Map.toList benchmarks) $ \(subject, tests) -> do
       h3_ $ toHtml subject
       div_ [style_ "overflow-x: scroll;"] do 
-        table_ do
+        table_ [class_ "metrics"] do
           thead_ do
             tr_ do
               th_ "Factor"

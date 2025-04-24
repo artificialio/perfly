@@ -5,13 +5,17 @@ import qualified Data.List as List
 import Data.Text (Text)
 import Yesod.Lucid
 import Perf.Types.Web
+import qualified Data.Text as T
 
 defaultLayout_ :: Text -> HtmlT (Reader (Page App)) a -> HtmlT (Reader (Page App)) a
 defaultLayout_ title body = do
   doctypehtml_ do
     head_ do
       title_ $ toHtml title
-      style_ "body {font-family: monospace; margin: 0 auto; max-width: 800px;}"
+      style_ $ T.unwords [
+             "body {font-family: monospace; margin: 0 auto; max-width: 800px;}",
+             "table.metrics td, table.metrics th {border: 1px solid black; padding: 2px;}"
+          ]
       script_ [
         src_ "https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js",
         integrity_ "CQBWl4fJHWbryGE+Pc7UAxWMUMNMWzWxF4SQo9CgkJIN1kx6djDQZjh3Y8SZ1d+6I+1zze6Z7kHXO7q3UyZAWw==",
