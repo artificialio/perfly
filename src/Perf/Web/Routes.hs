@@ -243,7 +243,7 @@ generatePluralMetric metrics = do
     div_ do
       table_ $ do
         property Bold "mean" (.metricMean)
-        property Small "stddev" (.metricStddev)
+        property Small "σ" (.metricStddev)
         property Small "min" (.metricRangeLower)
         property Small "max" (.metricRangeUpper)
   where

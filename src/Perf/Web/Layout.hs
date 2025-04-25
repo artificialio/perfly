@@ -11,6 +11,7 @@ defaultLayout_ :: Text -> HtmlT (Reader (Page App)) a -> HtmlT (Reader (Page App
 defaultLayout_ title body = do
   doctypehtml_ do
     head_ do
+      meta_ [charset_ "utf-8"]
       title_ $ toHtml title
       style_ $ T.unwords [
              "body {font-family: monospace; margin: 0 auto; max-width: 800px;}",
