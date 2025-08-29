@@ -28,6 +28,25 @@ https://your-deployed-perfly/branch/$BRANCH_NAME/$COMMIT_HASH?token=<YOUR TOKEN>
 
 ## Schema
 
+The simple idea is that for a given commit we do some benchmarks.
+
+* For each benchmark there is a **subject** (the thing being tested)
+  and a list of **tests** about that subject.
+* A test is a tuple of a list of **factors** and a set of **metrics**
+  collected.
+* You might test a **subject** with a few different combinations of
+  factors, which would yield a different set of metrics.
+* A **factor** in this schema is literally just a key/value pair of text
+  fields; you can put whatever you want. But it might be "iterations"
+  or "number of users" or "size of blah".
+* A **metric** consists of a name of a thing being measured (time,
+  space, faults, whatever) and then the following numbers: an
+  upper/lower range, mean and standard deviation.
+
+<details>
+<summary>See below for a JSON schema. There is an example in the next section.</summary>
+
+
 ```json
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -130,7 +149,14 @@ https://your-deployed-perfly/branch/$BRANCH_NAME/$COMMIT_HASH?token=<YOUR TOKEN>
 }
 ```
 
+</details>
+
 ## Example
+
+Below is an example of two test subjects with different factors each.
+
+<details>
+<summary>Expand for full JSON example.</summary>
 
 ```json
 {
@@ -280,6 +306,7 @@ https://your-deployed-perfly/branch/$BRANCH_NAME/$COMMIT_HASH?token=<YOUR TOKEN>
   }
 }
 ```
+</details>
 
 An example request:
 
