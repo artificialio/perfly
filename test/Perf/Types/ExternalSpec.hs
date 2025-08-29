@@ -3,7 +3,6 @@ module Perf.Types.ExternalSpec where
 import Test.Hspec
 import Perf.Types.External
 import Data.Aeson (decode)
-import Data.Aeson (Value(..))
 
 spec :: Spec
 spec = do
