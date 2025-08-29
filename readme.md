@@ -318,3 +318,5 @@ Environment="PORT=8080"
 [Install]
 WantedBy=multi-user.target
 ```
+
+You can deploy with HTTPS and OAuth2 protection using Caddy or similar.
