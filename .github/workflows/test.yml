@@ -1,0 +1,18 @@
+name: CI
+
+on:
+  push:
+    branches: [ "main", "cd/2025-08-29-add-gha-test" ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - uses: nixbuild/nix-quick-install-action@v28
+      with:
+        nix_conf: experimental-features = nix-command flakes
+    - run: nix build .#default
+    - run: nix flake check
