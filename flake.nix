@@ -49,6 +49,9 @@
 
         # haskell-flake doesn't set the default package, but you can do it here.
         packages.default = self'.packages.perfly;
+
+        # Hook up tests so `nix flake check` runs them
+        checks.default = self'.packages.perfly;
       };
     };
 }

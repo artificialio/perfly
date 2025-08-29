@@ -1,0 +1,17 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - uses: nixbuild/nix-quick-install-action@v28
+      with:
+        nix_conf: experimental-features = nix-command flakes
+    - run: nix build .#default
+    - run: nix flake check
