@@ -2,9 +2,8 @@ name: CI
 
 on:
   push:
-    branches: [ "main", "cd/2025-08-29-add-gha-test" ]
-  pull_request:
     branches: [ main ]
+  pull_request:
 
 jobs:
   build:
