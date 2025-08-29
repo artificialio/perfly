@@ -37,6 +37,7 @@ dependencies:
 - time
 - text
 - unliftio
+- unix
 - exceptions
 - rio
 - formatting
