@@ -1,23 +1,22 @@
 name: Push Docker Image
-
 on:
-  release:
-    types: [released]
-
+  workflow_dispatch:
+    inputs:
+      release_name:
+        description: 'Release name/tag for the Docker image'
+        required: true
+        type: string
 jobs:
   docker:
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
-
     steps:
       - uses: actions/checkout@v4
-
       - uses: nixbuild/nix-quick-install-action@v28
         with:
           nix_conf: experimental-features = nix-command flakes
-
       # Log in to GHCR
       - name: Log in to GHCR
         uses: docker/login-action@v3
@@ -25,11 +24,9 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-
       # Create a docker image
       - run: nix run .#packages.x86_64-linux.container.copyToDockerDaemon
-      - run: docker tag perfly:latest ghcr.io/artificialio/perfly:${{ github.event.release.tag_name }}
-
+      - run: docker tag perfly:latest ghcr.io/artificialio/perfly:${{ inputs.release_name }}
       # Build and push the image
       - name: Build and Push Docker image
         uses: docker/build-push-action@v6
@@ -38,4 +35,4 @@ jobs:
           push: true
           tags: |
             ghcr.io/artificialio/perfly:latest
-            ghcr.io/artificialio/perfly:${{ github.event.release.tag_name }}
+            ghcr.io/artificialio/perfly:${{ inputs.release_name }}
