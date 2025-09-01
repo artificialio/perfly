@@ -29,11 +29,5 @@ jobs:
       - run: nix run .#packages.x86_64-linux.container.copyToDockerDaemon
       - run: docker tag perfly:latest ghcr.io/artificialio/perfly:${{ inputs.release_name }}
       # Build and push the image
-      - name: Build and Push Docker image
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          push: true
-          tags: |
-            ghcr.io/artificialio/perfly:latest
-            ghcr.io/artificialio/perfly:${{ inputs.release_name }}
+      - name: Push Docker image
+        run: docker push ghcr.io/artificialio/perfly:${{ inputs.release_name }}
