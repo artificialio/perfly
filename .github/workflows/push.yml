@@ -6,6 +6,7 @@ on:
         description: 'Release name/tag for the Docker image'
         required: true
         type: string
+
 jobs:
   docker:
     runs-on: ubuntu-latest
