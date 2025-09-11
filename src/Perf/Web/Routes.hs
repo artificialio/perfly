@@ -198,6 +198,11 @@ getCompareCommitsR before after = do
       benchmarks <- db $ materializeCommits $ hash0 NonEmpty.:| [hash1]
       lucid do
         defaultLayout_ "Compare commits" do
+          div_ do
+            p_ do
+              div_ $ colorize "grey" "grey: no significant change wrt stddev"
+              div_ $ colorize "red" "red: change exceeding max stddev"
+              div_ $ colorize "purple" "purple: some change, not seemingly significant"
           generateTable generatePluralMetric benchmarks
 
 generateTable ::
@@ -244,14 +249,14 @@ generatePluralMetric metrics0 = do
   td_ do
     div_ do
       table_ $ do
-        property Bold "mean" (.metricMean)
-        property Small "σ" (.metricStddev)
-        property Small "min" (.metricRangeLower)
-        property Small "max" (.metricRangeUpper)
+        let stddev = foldl1 max $ map (.metricStddev) $ metrics
+        property (Just stddev) Bold "mean" (.metricMean)
+        property Nothing Small "σ" (.metricStddev)
+        property Nothing Small "min" (.metricRangeLower)
+        property Nothing Small "max" (.metricRangeUpper)
   where
     metrics = List.sortBy (RIO.comparing $ RIO.Down . (.metricTestId)) $ Map.elems metrics0
-    colorize color s = span_ [style_ ("color: " <> color)] s
-    property style label accessor = do
+    property mstddev style label accessor = do
       let textWrapper = case style of
            Bold -> strong_
            Small -> small_
@@ -265,11 +270,21 @@ generatePluralMetric metrics0 = do
                    map (shortNum . accessor) $
                    metrics
                  "="
-                 colorize "red" $ shortNum $ diff
+                 case mstddev of
+                   Just stddev
+                     | abs diff < stddev ->
+                       colorize "grey" $ shortNum $ diff
+                     | otherwise ->
+                       colorize "red" $ shortNum $ diff
+                   Nothing ->
+                     colorize "purple" $ shortNum $ diff
              else
                  sequence_ $
                    map (shortNum . accessor) $
                    take 1 metrics
+
+colorize :: Monad m => Text -> HtmlT m () -> HtmlT m ()
+colorize color s = span_ [style_ ("color: " <> color)] s
 
 shortNum :: Double -> Html ()
 shortNum =
