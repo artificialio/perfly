@@ -23,7 +23,7 @@ materializeCommits ::
 materializeCommits commits = do
   benchmarks <- traverse materializeCommit commits
   pure $
-    List.foldl1' (Map.intersectionWith (Map.unionWith (Map.unionWith Map.union))) $
+    List.foldl1' (Map.unionWith (Map.unionWith (Map.unionWith Map.union))) $
     NonEmpty.toList $
     fmap (fmap (fmap (fmap (\(commit, metric) -> Map.singleton commit metric)))) $
     benchmarks
