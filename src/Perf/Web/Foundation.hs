@@ -11,6 +11,7 @@ import Perf.Types.Prim
 
 mkYesodData "App" [parseRoutes|
   / HomeR GET
+  /branches BranchesR GET
   /branch/#Text BranchR GET
   /branch/#Text/#Hash BranchCommitR GET
   /commit/#Hash CommitR GET
@@ -25,7 +26,8 @@ instance YesodBreadcrumbs App where
   breadcrumb r =
     case r of
       HomeR -> return ("Home",Nothing)
-      BranchR name -> return (name, Just HomeR)
+      BranchesR -> return ("Branches",Just HomeR)
+      BranchR name -> return (name, Just BranchesR)
       CommitR hash -> return (coerce hash, Just HomeR)
       CompareCommitsR hash0 hash1 ->
         let short x = T.take 8 $ coerce x

@@ -31,8 +31,11 @@ import RIO qualified
 import Data.Foldable
 import Yesod hiding (toHtml, Html)
 
-getHomeR :: Handler (Html ())
-getHomeR = do
+getHomeR :: Handler ()
+getHomeR = redirect $ BranchR "master"
+
+getBranchesR :: Handler (Html ())
+getBranchesR = do
   master <- db $ selectList @DB.Branch [DB.BranchName ==. "master"] []
   branches <- fmap (List.filter (not . T.isPrefixOf "gh-readonly-queue/" . (.entityVal.branchName))) $
     db $ selectList @DB.Branch [DB.BranchName !=. "master"] [Desc DB.BranchCreatedAt]
