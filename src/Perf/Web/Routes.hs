@@ -126,7 +126,7 @@ makeChartConfig metricName commits dataSets =
   , "data" .= chartData
   , "options" .= object
       [ "responsive" .= True
-      , "maintainAspectRatio" .= False
+      , "maintainAspectRatio" .= True
       , "animations" .= False
       , "plugins" .= object
           [ "title" .= object
@@ -137,8 +137,16 @@ makeChartConfig metricName commits dataSets =
                   ]
               ]
           , "tooltip" .= object
-              [ "callbacks" .= object
-                  [ "title" .= ("function(tooltipItems) { return 'Commit: ' + tooltipItems[0].label; }" :: Text)
+              [ "mode" .= ("point" :: Text)
+              , "intersect" .= False
+              ]
+          , "crosshair" .= object
+              [ "sync" .= object
+                  [ "enabled" .= True
+                  , "group" .= (1 :: Int)
+                  ]
+              , "zoom" .= object
+                  [ "enabled" .= True
                   ]
               ]
           ]
