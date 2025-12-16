@@ -1,35 +1,35 @@
 module Perf.Web.Routes where
 
 import Data.Bifunctor
-import Perf.Web.Chart
-import Data.Traversable
-import qualified Data.List.NonEmpty as NonEmpty
-import Lucid.Base
-import qualified Data.List as List
-import Data.Set (Set)
-import Data.Map (Map)
-import qualified Data.Map as Map
-import qualified Data.Set as Set
-import qualified Perf.Types.Prim as Prim
-import Database.Persist
-import qualified Perf.Types.DB as DB
 import Data.Coerce
-import Text.Printf
-import qualified Data.Containers.ListUtils as List
-import qualified Data.Text as T
-import Perf.Web.Layout
-import Yesod.Lucid
+import Data.Containers.ListUtils qualified as List
+import Data.Foldable
+import Data.List qualified as List
+import Data.List.NonEmpty qualified as NonEmpty
+import Data.Map (Map)
+import Data.Map qualified as Map
 import Data.Maybe
-import Perf.Web.Db
-import Perf.Web.Foundation
-import Perf.Types.Web
+import Data.Set (Set)
+import Data.Set qualified as Set
 import Data.Text (Text)
-import qualified Perf.Types.External as EX
+import Data.Text qualified as T
+import Data.Traversable
+import Database.Persist
+import Lucid.Base
 import Perf.DB.Import
 import Perf.DB.Materialize
+import Perf.Types.DB qualified as DB
+import Perf.Types.External qualified as EX
+import Perf.Types.Prim qualified as Prim
+import Perf.Types.Web
+import Perf.Web.Chart
+import Perf.Web.Db
+import Perf.Web.Foundation
+import Perf.Web.Layout
 import RIO qualified
-import Data.Foldable
-import Yesod hiding (toHtml, Html)
+import Text.Printf
+import Yesod hiding (Html, toHtml)
+import Yesod.Lucid
 
 getHomeR :: Handler ()
 getHomeR = redirect $ BranchR "master"
@@ -37,8 +37,10 @@ getHomeR = redirect $ BranchR "master"
 getBranchesR :: Handler (Html ())
 getBranchesR = do
   master <- db $ selectList @DB.Branch [DB.BranchName ==. "master"] []
-  branches <- fmap (List.filter (not . T.isPrefixOf "gh-readonly-queue/" . (.entityVal.branchName))) $
-    db $ selectList @DB.Branch [DB.BranchName !=. "master"] [Desc DB.BranchCreatedAt]
+  branches <-
+    fmap (List.filter (not . T.isPrefixOf "gh-readonly-queue/" . (.entityVal.branchName))) $
+      db $
+        selectList @DB.Branch [DB.BranchName !=. "master"] [Desc DB.BranchCreatedAt]
   lucid do
     defaultLayout_ "Performance" do
       ul_ $
@@ -46,7 +48,8 @@ getBranchesR = do
           li_ do
             url <- asks (.url)
             a_ [href_ $ url $ BranchR branch.branchName] $
-             toHtml $ branch.branchName
+              toHtml $
+                branch.branchName
 
 getBranchR :: Text -> Handler (Html ())
 getBranchR name = do
@@ -56,8 +59,11 @@ getBranchR name = do
     Just (Entity branchId branch) -> do
       mmaxGraph <- fmap (>>= (RIO.readMaybe @Int . T.unpack)) $ lookupGetParam "limit"
       let maxGraph :: Int = fromMaybe 28 $ mmaxGraph
-      mappings <- db $ selectList [DB.MapBranchCommitBranchId ==. branchId]
-                                  [Desc DB.MapBranchCommitId, LimitTo maxGraph]
+      mappings <-
+        db $
+          selectList
+            [DB.MapBranchCommitBranchId ==. branchId]
+            [Desc DB.MapBranchCommitId, LimitTo maxGraph]
       commits <- fmap catMaybes $ RIO.for mappings \mapping ->
         db $ selectFirst [DB.CommitId ==. mapping.entityVal.mapBranchCommitCommitId] []
       mbenchmarks <- db $ for (NonEmpty.nonEmpty $ reverse commits) materializeCommits
@@ -72,15 +78,22 @@ getBranchR name = do
               url <- asks (.url)
               tr_ do
                 td_ $
-                  small_ $ toHtml $ show commit.commitCreatedAt
+                  small_ $
+                    toHtml $
+                      show commit.commitCreatedAt
                 td_ $
                   a_ [href_ $ url $ BranchCommitR name commit.commitHash] $
-                    code_ $ toHtml $ commit.commitHash
+                    code_ $
+                      toHtml $
+                        commit.commitHash
                 td_ $
                   for_ mprevious \previous ->
-                    a_ [href_ $ url $
-                          CompareCommitsR previous.commitHash commit.commitHash] $
-                      "compare previous"
+                    a_
+                      [ href_ $
+                          url $
+                            CompareCommitsR previous.commitHash commit.commitHash
+                      ]
+                      $ "compare previous"
           p_ $ small_ do
             "(limited to most recent "
             toHtml $ show maxGraph
@@ -93,14 +106,20 @@ factorsSmall :: Set Prim.GeneralFactor -> Text
 factorsSmall = T.intercalate "," . map factorSmall . toList
 
 generatePlots ::
-  (Map Prim.SubjectName
-      (Map (Set Prim.GeneralFactor)
-        (Map Prim.MetricLabel
-           (Map DB.Commit DB.Metric))))
-  -> Html ()
+  ( Map
+      Prim.SubjectName
+      ( Map
+          (Set Prim.GeneralFactor)
+          ( Map
+              Prim.MetricLabel
+              (Map DB.Commit DB.Metric)
+          )
+      )
+  ) ->
+  Html ()
 generatePlots benchmarks = do
   unless (Map.null benchmarks) $ h1_ "Plots"
-  for_ (zip [0 :: Int ..] (Map.toList benchmarks)) \(b_i,(subject, tests)) -> do
+  for_ (zip [0 :: Int ..] (Map.toList benchmarks)) \(b_i, (subject, tests)) -> do
     h2_ $ toHtml subject
     let labels :: Set DB.Commit =
           Set.fromList $ concatMap (concatMap Map.keys . Map.elems) $ Map.elems tests
@@ -110,8 +129,8 @@ generatePlots benchmarks = do
     div_ [style_ "display: flex; flex-wrap: wrap;"] do
       for_ (zip [0 :: Int ..] (toList metrics)) \(m_i, metricLabel) -> do
         let dataSets =
-              map (second (maybe [] Map.elems . Map.lookup metricLabel))
-              $ Map.toList tests
+              map (second (maybe [] Map.elems . Map.lookup metricLabel)) $
+                Map.toList tests
         chart_ (T.pack (show b_i) <> "-" <> T.pack (show m_i)) $
           makeChartConfig metricLabel labels dataSets
 
@@ -122,60 +141,82 @@ makeChartConfig ::
   Value
 makeChartConfig metricName commits dataSets =
   object
-  [ "type" .= ("line" :: Text)
-  , "data" .= chartData
-  , "options" .= object
-      [ "responsive" .= True
-      , "maintainAspectRatio" .= False
-      , "animations" .= False
-      , "plugins" .= object
-          [ "title" .= object
-              [ "display" .= True
-              , "text" .= coerce @_ @Text metricName
-              , "font" .= object
-                  [ "size" .= (16 :: Int)
-                  ]
-              ]
-          , "tooltip" .= object
-              [ "callbacks" .= object
-                  [ "title" .= ("function(tooltipItems) { return 'Commit: ' + tooltipItems[0].label; }" :: Text)
-                  ]
-              ]
+    [ "type" .= ("line" :: Text),
+      "data" .= chartData,
+      "options"
+        .= object
+          [ "responsive" .= True,
+            "maintainAspectRatio" .= True,
+            "animations" .= False,
+            "plugins"
+              .= object
+                [ "title"
+                    .= object
+                      [ "display" .= True,
+                        "text" .= coerce @_ @Text metricName,
+                        "font"
+                          .= object
+                            [ "size" .= (16 :: Int)
+                            ]
+                      ],
+                  "tooltip"
+                    .= object
+                      [ "mode" .= ("point" :: Text),
+                        "intersect" .= False
+                      ],
+                  "crosshair"
+                    .= object
+                      [ "sync"
+                          .= object
+                            [ "enabled" .= True,
+                              "group" .= (1 :: Int)
+                            ],
+                        "zoom"
+                          .= object
+                            [ "enabled" .= True
+                            ]
+                      ]
+                ],
+            "scales"
+              .= object
+                [ "x"
+                    .= object
+                      [ "title"
+                          .= object
+                            [ "display" .= False,
+                              "text" .= ("Commits" :: Text)
+                            ]
+                      ],
+                  "y"
+                    .= object
+                      [ "title"
+                          .= object
+                            [ "display" .= True,
+                              "text" .= coerce @_ @Text metricName
+                            ],
+                        "beginAtZero" .= True
+                      ]
+                ]
           ]
-      , "scales" .= object
-          [ "x" .= object
-              [ "title" .= object
-                  [ "display" .= False
-                  , "text" .= ("Commits" :: Text)
-                  ]
-              ]
-          , "y" .= object
-              [ "title" .= object
-                  [ "display" .= True
-                  , "text" .= coerce @_ @Text metricName
-                  ]
-              , "beginAtZero" .= True
-              ]
-          ]
-      ]
-  ]
-
+    ]
   where
-    chartData = object
-      [ "labels" .= List.map (T.take 8 . (coerce :: Prim.Hash -> Text) . (.commitHash)) (Set.toList commits)
-      , "datasets" .=
-          [ object
-              [ "label" .= factorsSmall factors
-              , "data" .= fillLeft (Set.size commits) Null (map (toJSON . (.metricMean)) metrics :: [Value])
-              , "borderColor" .= color
-              , "tension" .= (0.1 :: Double)
-              , "fill" .= False
-              ]
-          | ((factors, metrics), color) <- zip dataSets $ cycle colors
-          ]
-      ]
-    colors :: [Text] = T.words
-      "#4394E5 #87BB62 #876FD4 #F5921B"
+    chartData =
+      object
+        [ "labels" .= List.map (T.take 8 . (coerce :: Prim.Hash -> Text) . (.commitHash)) (Set.toList commits),
+          "datasets"
+            .= [ object
+                   [ "label" .= factorsSmall factors,
+                     "data" .= fillLeft (Set.size commits) Null (map (toJSON . (.metricMean)) metrics :: [Value]),
+                     "borderColor" .= color,
+                     "tension" .= (0.1 :: Double),
+                     "fill" .= False
+                   ]
+                 | ((factors, metrics), color) <- zip dataSets $ cycle colors
+               ]
+        ]
+    colors :: [Text] =
+      T.words
+        "#4394E5 #87BB62 #876FD4 #F5921B"
 
 fillLeft :: Int -> a -> [a] -> [a]
 fillLeft n x xs = replicate (n - length xs) x <> xs
@@ -191,13 +232,13 @@ getCommitR hash = do
         defaultLayout_ (coerce commit.entityVal.commitHash) do
           generateTable generateSingleMetric benchmarks
 
-getCompareCommitsR :: Prim.Hash ->  Prim.Hash -> Handler (Html ())
+getCompareCommitsR :: Prim.Hash -> Prim.Hash -> Handler (Html ())
 getCompareCommitsR before after = do
   mhash0 <- db $ selectFirst [DB.CommitHash ==. before] []
   mhash1 <- db $ selectFirst [DB.CommitHash ==. after] []
   case (,) <$> mhash0 <*> mhash1 of
     Nothing -> notFound
-    Just (hash0,hash1) -> do
+    Just (hash0, hash1) -> do
       benchmarks <- db $ materializeCommits $ hash0 NonEmpty.:| [hash1]
       lucid do
         defaultLayout_ "Compare commits" do
@@ -210,11 +251,17 @@ getCompareCommitsR before after = do
 
 generateTable ::
   (metric -> Html ()) ->
-  (Map Prim.SubjectName
-      (Map (Set Prim.GeneralFactor)
-        (Map Prim.MetricLabel
-           metric)))
- -> HtmlT (Reader (Page App)) ()
+  ( Map
+      Prim.SubjectName
+      ( Map
+          (Set Prim.GeneralFactor)
+          ( Map
+              Prim.MetricLabel
+              metric
+          )
+      )
+  ) ->
+  HtmlT (Reader (Page App)) ()
 generateTable generateMetric benchmarks =
   div_ do
     forM_ (Map.toList benchmarks) $ \(subject, tests) -> do
@@ -225,12 +272,12 @@ generateTable generateMetric benchmarks =
             tr_ do
               th_ "Factor"
               let headings =
-                    List.nubOrd $
-                    List.concatMap
-                      (\(_factors, metrics) -> Map.keys metrics)
+                    List.nubOrd
+                      $ List.concatMap
+                        (\(_factors, metrics) -> Map.keys metrics)
                       $ Map.toList tests
               for_ headings $ \factor ->
-                 th_ $ toHtml factor
+                th_ $ toHtml factor
           tbody_ do
             forM_ (Map.toList tests) $ \(factors, metrics) -> do
               tr_ do
@@ -261,40 +308,41 @@ generatePluralMetric metrics0 = do
     metrics = List.sortBy (RIO.comparing $ RIO.Down . (.metricTestId)) $ Map.elems metrics0
     property mstddev style label accessor = do
       let textWrapper = case style of
-           Bold -> strong_
-           Small -> small_
+            Bold -> strong_
+            Small -> small_
       tr_ $ do
-           td_ $ textWrapper $ em_ label
-           td_$ textWrapper $ do
-             let diff = foldl1 (-) $ map accessor $ metrics
-             if length metrics > 1 && diff /= 0 then do
-                 sequence_ $
-                   List.intersperse "-" $
-                   map (shortNum . accessor) $
-                   metrics
-                 "="
-                 case mstddev of
-                   Just stddev
-                     | abs diff < stddev ->
-                       colorize "grey" $ shortNum $ diff
-                     | otherwise ->
-                       colorize "red" $ shortNum $ diff
-                   Nothing ->
-                     colorize "purple" $ shortNum $ diff
-             else
-                 sequence_ $
-                   map (shortNum . accessor) $
-                   take 1 metrics
+        td_ $ textWrapper $ em_ label
+        td_ $ textWrapper $ do
+          let diff = foldl1 (-) $ map accessor $ metrics
+          if length metrics > 1 && diff /= 0
+            then do
+              sequence_ $
+                List.intersperse "-" $
+                  map (shortNum . accessor) $
+                    metrics
+              "="
+              case mstddev of
+                Just stddev
+                  | abs diff < stddev ->
+                      colorize "grey" $ shortNum $ diff
+                  | otherwise ->
+                      colorize "red" $ shortNum $ diff
+                Nothing ->
+                  colorize "purple" $ shortNum $ diff
+            else
+              sequence_ $
+                map (shortNum . accessor) $
+                  take 1 metrics
 
 colorize :: Monad m => Text -> HtmlT m () -> HtmlT m ()
 colorize color s = span_ [style_ ("color: " <> color)] s
 
 shortNum :: Double -> Html ()
 shortNum =
-  span_ [style_ "font-family: monospace"] .
-  toHtml .
-  T.pack .
-  printf @(Double -> String) "%.3f"
+  span_ [style_ "font-family: monospace"]
+    . toHtml
+    . T.pack
+    . printf @(Double -> String) "%.3f"
 
 getBranchCommitR :: Text -> Prim.Hash -> Handler (Html ())
 getBranchCommitR branch hash = do
@@ -306,8 +354,13 @@ getBranchCommitR branch hash = do
       case mcommit of
         Nothing -> notFound
         Just (Entity commitId _) -> do
-          isMapped <- db $ selectFirst [DB.MapBranchCommitBranchId ==. branchId,
-                                        DB.MapBranchCommitCommitId ==. commitId] []
+          isMapped <-
+            db $
+              selectFirst
+                [ DB.MapBranchCommitBranchId ==. branchId,
+                  DB.MapBranchCommitCommitId ==. commitId
+                ]
+                []
           case isMapped of
             Nothing -> notFound
             Just {} -> getCommitR hash
@@ -320,6 +373,6 @@ postReceiverR = do
     Nothing -> invalidArgs ["No token."]
     Just given
       | given == token -> do
-        commit :: EX.Commit <- requireCheckJsonBody
-        db $ importCommit commit
+          commit :: EX.Commit <- requireCheckJsonBody
+          db $ importCommit commit
       | otherwise -> permissionDenied "Bad token."
