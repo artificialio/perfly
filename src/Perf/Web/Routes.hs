@@ -174,7 +174,8 @@ makePlotlyConfig metricName commits dataSets =
               ],
           "font" .= object ["family" .= ("monospace" :: Text)],
           "hovermode" .= ("x unified" :: Text),
-          "showlegend" .= False,
+          "showlegend" .= True,
+          "legend" .= object ["x" .= (1 :: Int), "y" .= (0 :: Int), "xanchor" .= ("right" :: Text), "bgcolor" .= ("rgba(0,0,0,0)" :: Text), "font" .= object ["color" .= ("rgba(0,0,0,0.4)" :: Text)]],
           "margin" .= object ["t" .= (40 :: Int), "b" .= (40 :: Int), "l" .= (60 :: Int), "r" .= (20 :: Int)]
         ]
     colors :: [Text] =
