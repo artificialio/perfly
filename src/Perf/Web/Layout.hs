@@ -19,21 +19,11 @@ defaultLayout_ title body = do
             "table.metrics td, table.metrics th {border: 1px solid black; padding: 2px;}"
           ]
       script_
-        [ src_ "https://cdn.jsdelivr.net/npm/chart.js@4.5.1/dist/chart.umd.min.js",
-          integrity_ "sha256-SERKgtTty1vsDxll+qzd4Y2cF9swY9BCq62i9wXJ9Uo=",
+        [ src_ "https://cdn.jsdelivr.net/npm/plotly.js-dist-min@2.35.2/plotly.min.js",
           crossorigin_ "anonymous",
           makeAttributes "referrerpolicy" "no-referrer"
         ]
         (mempty :: Text)
-      script_
-        [ src_ "https://cdn.jsdelivr.net/npm/chartjs-plugin-crosshair@2.0.0/dist/chartjs-plugin-crosshair.min.js",
-          integrity_ "sha256-5bTtdEYtbjO36pQbMCXOsoYW5u5jfYfyI41LelMTTbQ=",
-          crossorigin_ "anonymous",
-          makeAttributes "referrerpolicy" "no-referrer"
-        ]
-        (mempty :: Text)
-      script_ [type_ "text/javascript"] $ do
-        toHtmlRaw ("Chart.defaults.font.family = 'monospace';" :: Text)
     body_ do
       h1_ $ toHtml title
       crumbs <- asks (.crumbs)
