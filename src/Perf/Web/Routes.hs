@@ -131,88 +131,52 @@ generatePlots benchmarks = do
         let dataSets =
               map (second (maybe [] Map.elems . Map.lookup metricLabel)) $
                 Map.toList tests
-        chart_ (T.pack (show b_i) <> "-" <> T.pack (show m_i)) $
-          makeChartConfig metricLabel labels dataSets
+        let (plotData, layout) = makePlotlyConfig metricLabel labels dataSets
+        chart_ (T.pack (show b_i) <> "-" <> T.pack (show m_i)) plotData layout
 
-makeChartConfig ::
+makePlotlyConfig ::
   Prim.MetricLabel ->
   Set DB.Commit ->
   [(Set Prim.GeneralFactor, [DB.Metric])] ->
-  Value
-makeChartConfig metricName commits dataSets =
-  object
-    [ "type" .= ("line" :: Text),
-      "data" .= chartData,
-      "options"
-        .= object
-          [ "responsive" .= True,
-            "maintainAspectRatio" .= True,
-            "animations" .= False,
-            "plugins"
-              .= object
-                [ "title"
-                    .= object
-                      [ "display" .= True,
-                        "text" .= coerce @_ @Text metricName,
-                        "font"
-                          .= object
-                            [ "size" .= (16 :: Int)
-                            ]
-                      ],
-                  "tooltip"
-                    .= object
-                      [ "mode" .= ("point" :: Text),
-                        "intersect" .= False
-                      ],
-                  "crosshair"
-                    .= object
-                      [ "sync"
-                          .= object
-                            [ "enabled" .= True,
-                              "group" .= (1 :: Int)
-                            ],
-                        "zoom"
-                          .= object
-                            [ "enabled" .= True
-                            ]
-                      ]
-                ],
-            "scales"
-              .= object
-                [ "x"
-                    .= object
-                      [ "title"
-                          .= object
-                            [ "display" .= False,
-                              "text" .= ("Commits" :: Text)
-                            ]
-                      ],
-                  "y"
-                    .= object
-                      [ "title"
-                          .= object
-                            [ "display" .= True,
-                              "text" .= coerce @_ @Text metricName
-                            ],
-                        "beginAtZero" .= True
-                      ]
-                ]
-          ]
-    ]
+  (Value, Value)
+makePlotlyConfig metricName commits dataSets =
+  (toJSON traces, layout)
   where
-    chartData =
+    commitLabels = List.map (T.take 8 . (coerce :: Prim.Hash -> Text) . (.commitHash)) (Set.toList commits)
+    traces =
+      [ object
+          [ "x" .= commitLabels,
+            "y" .= fillLeft (Set.size commits) Null (map (toJSON . (.metricMean)) metrics :: [Value]),
+            "type" .= ("scatter" :: Text),
+            "mode" .= ("lines+markers" :: Text),
+            "name" .= factorsSmall factors,
+            "line" .= object ["color" .= color]
+          ]
+        | ((factors, metrics), color) <- zip dataSets $ cycle colors
+      ]
+    layout =
       object
-        [ "labels" .= List.map (T.take 8 . (coerce :: Prim.Hash -> Text) . (.commitHash)) (Set.toList commits),
-          "datasets"
-            .= [ object
-                   [ "label" .= factorsSmall factors,
-                     "data" .= fillLeft (Set.size commits) Null (map (toJSON . (.metricMean)) metrics :: [Value]),
-                     "borderColor" .= color,
-                     "tension" .= (0.1 :: Double),
-                     "fill" .= False
-                   ]
-                 | ((factors, metrics), color) <- zip dataSets $ cycle colors
-               ]
+        [ "title"
+            .= object
+              [ "text" .= coerce @_ @Text metricName,
+                "font" .= object ["family" .= ("monospace" :: Text), "size" .= (16 :: Int)]
+              ],
+          "xaxis"
+            .= object
+              [ "title" .= ("" :: Text),
+                "tickfont" .= object ["family" .= ("monospace" :: Text)]
+              ],
+          "yaxis"
+            .= object
+              [ "title" .= coerce @_ @Text metricName,
+                "rangemode" .= ("tozero" :: Text),
+                "tickfont" .= object ["family" .= ("monospace" :: Text)]
+              ],
+          "font" .= object ["family" .= ("monospace" :: Text)],
+          "hovermode" .= ("x unified" :: Text),
+          "showlegend" .= True,
+          "legend" .= object ["x" .= (1 :: Int), "y" .= (0 :: Int), "xanchor" .= ("right" :: Text), "bgcolor" .= ("rgba(0,0,0,0)" :: Text), "font" .= object ["color" .= ("rgba(0,0,0,0.4)" :: Text)]],
+          "margin" .= object ["t" .= (40 :: Int), "b" .= (40 :: Int), "l" .= (60 :: Int), "r" .= (20 :: Int)]
         ]
     colors :: [Text] =
       T.words

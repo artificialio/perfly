@@ -5,9 +5,10 @@
     haskell-flake.url = "github:srid/haskell-flake";
     hell.url = "github:chrisdone/hell?ref=551133cecdafed1d6d3f4da7d8a466df2eed8af5";
     nix2container.url = "github:nlewo/nix2container";
+    nixd.url = "github:nix-community/nixd";
   };
 
-  outputs = inputs@{ self, nixpkgs, flake-parts, hell, nix2container, ... }:
+  outputs = inputs@{ self, nixpkgs, flake-parts, hell, nix2container, nixd, ... }:
     flake-parts.lib.mkFlake { inherit inputs; } {
       systems = nixpkgs.lib.systems.flakeExposed;
       imports = [ inputs.haskell-flake.flakeModule ];
@@ -42,7 +43,7 @@
               hpack = hp.hpack;
               webook = pkgs.webhook;
               hell = hell.packages.${system}.default;
-
+              nixd = nixd.packages.${system}.default;
             };
 
           };
