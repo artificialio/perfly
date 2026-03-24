@@ -10,20 +10,7 @@ import Yesod.Lucid
 defaultLayout_ :: Text -> HtmlT (Reader (Page App)) a -> HtmlT (Reader (Page App)) a
 defaultLayout_ title body = do
   doctypehtml_ do
-    head_ do
-      meta_ [charset_ "utf-8"]
-      title_ $ toHtml title
-      style_ $
-        T.unwords
-          [ "body {font-family: monospace; margin: 0 auto; max-width: 800px;}",
-            "table.metrics td, table.metrics th {border: 1px solid black; padding: 2px;}"
-          ]
-      script_
-        [ src_ "https://cdn.jsdelivr.net/npm/plotly.js-dist-min@2.35.2/plotly.min.js",
-          crossorigin_ "anonymous",
-          makeAttributes "referrerpolicy" "no-referrer"
-        ]
-        (mempty :: Text)
+    headCommon_ title
     body_ do
       h1_ $ toHtml title
       crumbs <- asks (.crumbs)
@@ -34,3 +21,28 @@ defaultLayout_ title body = do
                 a_ [href_ (url route)] $ toHtml display
           sequence_ $ List.intersperse (em_ " / ") loaf
       body
+
+staticLayout_ :: Text -> Html () -> Html ()
+staticLayout_ title body =
+  doctypehtml_ do
+    headCommon_ title
+    body_ do
+      h1_ $ toHtml title
+      body
+
+headCommon_ :: Monad m => Text -> HtmlT m ()
+headCommon_ title =
+  head_ do
+    meta_ [charset_ "utf-8"]
+    title_ $ toHtml title
+    style_ $
+      T.unwords
+        [ "body {font-family: monospace; margin: 0 auto; max-width: 800px;}",
+          "table.metrics td, table.metrics th {border: 1px solid black; padding: 2px;}"
+        ]
+    script_
+      [ src_ "https://cdn.jsdelivr.net/npm/plotly.js-dist-min@2.35.2/plotly.min.js",
+        crossorigin_ "anonymous",
+        makeAttributes "referrerpolicy" "no-referrer"
+      ]
+      (mempty :: Text)

@@ -26,6 +26,55 @@ Data is stored in a simple SQLite database.
 The URL to send data is:
 https://your-deployed-perfly/branch/$BRANCH_NAME/$COMMIT_HASH?token=<YOUR TOKEN>
 
+## Static HTML report CLI
+
+The project also provides a CLI tool that renders benchmark graphs to a
+standalone HTML file (using the same Plotly graph style as the web UI)
+and opens it locally.
+
+### Build
+
+With Cabal:
+
+```sh
+cabal build benchmark-display
+```
+
+### Usage
+
+Run with JSON files (each file must be a top-level JSON array of
+`Benchmark` values, not a `Commit` object):
+
+```sh
+cabal run benchmark-display -- run-1.json run-2.json
+```
+
+Write to a custom output path:
+
+```sh
+cabal run benchmark-display -- --output reports/benchmark-display.html run-1.json run-2.json
+```
+
+Read data from SQLite (same DB model as the web server):
+
+```sh
+cabal run benchmark-display -- --sqlite perf.sqlite3 --branch master --limit 28
+```
+
+Behavior:
+
+- The generated file defaults to `benchmark-display.html`.
+- After writing, the tool runs `open benchmark-display.html` on macOS
+  (or `xdg-open` on Linux).
+- X-axis labels are derived from input files in CLI argument order.
+- If a filename ends with `-<hex>.json`, that `<hex>` suffix
+  is used as the label; otherwise the `.json`-stripped basename is used.
+
+Examples of labels:
+
+- `bench-master-1e2a4b.json` -> `1e2a4b`
+- `benchmark_snapshot.json` -> `benchmark_snapshot`
+
 ## Schema
 
 The simple idea is that for a given commit we do some benchmarks.
