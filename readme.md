@@ -34,11 +34,35 @@ and opens it locally.
 
 ### Build
 
-With Cabal:
+`cabal build benchmark-display`
+
+### Install
+
+Install `benchmark-display` to a user's bin directory:
 
 ```sh
-cabal build benchmark-display
+mkdir -p "$HOME/.local/bin"
+cabal install benchmark-display \
+  --install-method=copy \
+  --installdir="$HOME/.local/bin" \
+  --overwrite-policy=always
 ```
+
+Make sure your shell `PATH` includes that directory (for zsh):
+
+```sh
+echo 'export PATH="$HOME/.local/bin:$PATH"' >> "$HOME/.zshrc"
+source "$HOME/.zshrc"
+```
+
+Then you can run:
+
+```sh
+benchmark-display --help
+```
+
+If you prefer not to install, use `cabal run benchmark-display -- ...`
+from the project directory.
 
 ### Usage
 
@@ -46,22 +70,28 @@ Run with JSON files (each file must be a top-level JSON array of
 `Benchmark` values, not a `Commit` object):
 
 ```sh
-cabal run benchmark-display -- run-1.json run-2.json
+benchmark-display run-1.json run-2.json
 ```
 
 Write to a custom output path:
 
 ```sh
-cabal run benchmark-display -- --output reports/benchmark-display.html run-1.json run-2.json
+benchmark-display --output reports/benchmark-display.html run-1.json run-2.json
 ```
 
 Read data from SQLite (same DB model as the web server):
 
 ```sh
-cabal run benchmark-display -- --sqlite perf.sqlite3 --branch master --limit 28
+benchmark-display --sqlite perf.sqlite3 --branch master --limit 28
 ```
 
-Behavior:
+If you did not install to the path, the commands need to be modified like this:
+
+```sh
+cabal run benchmark-display -- --output benchmark.html run-1.json run-2.json
+```
+
+Notes:
 
 - The generated file defaults to `benchmark-display.html`.
 - After writing, the tool runs `open benchmark-display.html` on macOS
