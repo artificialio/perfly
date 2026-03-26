@@ -26,6 +26,85 @@ Data is stored in a simple SQLite database.
 The URL to send data is:
 https://your-deployed-perfly/branch/$BRANCH_NAME/$COMMIT_HASH?token=<YOUR TOKEN>
 
+## Static HTML report CLI
+
+The project also provides a CLI tool that renders benchmark graphs to a
+standalone HTML file (using the same Plotly graph style as the web UI)
+and opens it locally.
+
+### Build
+
+`cabal build benchmark-display`
+
+### Install
+
+Install `benchmark-display` to a user's bin directory:
+
+```sh
+mkdir -p "$HOME/.local/bin"
+cabal install benchmark-display \
+  --install-method=copy \
+  --installdir="$HOME/.local/bin" \
+  --overwrite-policy=always
+```
+
+Make sure your shell `PATH` includes that directory (for zsh):
+
+```sh
+echo 'export PATH="$HOME/.local/bin:$PATH"' >> "$HOME/.zshrc"
+source "$HOME/.zshrc"
+```
+
+Then you can run:
+
+```sh
+benchmark-display --help
+```
+
+If you prefer not to install, use `cabal run benchmark-display -- ...`
+from the project directory.
+
+### Usage
+
+Run with JSON files (each file must be a top-level JSON array of
+`Benchmark` values, not a `Commit` object):
+
+```sh
+benchmark-display run-1.json run-2.json
+```
+
+Write to a custom output path:
+
+```sh
+benchmark-display --output reports/benchmark-display.html run-1.json run-2.json
+```
+
+Read data from SQLite (same DB model as the web server):
+
+```sh
+benchmark-display --sqlite perf.sqlite3 --branch master --limit 28
+```
+
+If you did not install to the path, the commands need to be modified like this:
+
+```sh
+cabal run benchmark-display -- --output benchmark.html run-1.json run-2.json
+```
+
+Notes:
+
+- The generated file defaults to `benchmark-display.html`.
+- After writing, the tool runs `open benchmark-display.html` on macOS
+  (or `xdg-open` on Linux).
+- X-axis labels are derived from input files in CLI argument order.
+- If a filename ends with `-<hex>.json`, that `<hex>` suffix
+  is used as the label; otherwise the `.json`-stripped basename is used.
+
+Examples of labels:
+
+- `bench-master-1e2a4b.json` -> `1e2a4b`
+- `benchmark_snapshot.json` -> `benchmark_snapshot`
+
 ## Schema
 
 The simple idea is that for a given commit we do some benchmarks.

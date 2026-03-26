@@ -1,6 +1,5 @@
 module Perf.Web.Routes where
 
-import Data.Bifunctor
 import Data.Coerce
 import Data.Containers.ListUtils qualified as List
 import Data.Foldable
@@ -10,7 +9,6 @@ import Data.Map (Map)
 import Data.Map qualified as Map
 import Data.Maybe
 import Data.Set (Set)
-import Data.Set qualified as Set
 import Data.Text (Text)
 import Data.Text qualified as T
 import Data.Traversable
@@ -21,11 +19,11 @@ import Perf.DB.Materialize
 import Perf.Types.DB qualified as DB
 import Perf.Types.External qualified as EX
 import Perf.Types.Prim qualified as Prim
-import Perf.Types.Web
-import Perf.Web.Chart
+import Perf.Types.Web 
 import Perf.Web.Db
 import Perf.Web.Foundation
 import Perf.Web.Layout
+import Perf.Web.Plot
 import RIO qualified
 import Text.Printf
 import Yesod hiding (Html, toHtml)
@@ -99,91 +97,10 @@ getBranchR name = do
             toHtml $ show maxGraph
             " commits)"
 
-factorSmall :: Prim.GeneralFactor -> Text
-factorSmall factor = T.concat [T.strip factor.name, "=", T.strip factor.value]
-
-factorsSmall :: Set Prim.GeneralFactor -> Text
-factorsSmall = T.intercalate "," . map factorSmall . toList
-
 generatePlots ::
-  ( Map
-      Prim.SubjectName
-      ( Map
-          (Set Prim.GeneralFactor)
-          ( Map
-              Prim.MetricLabel
-              (Map DB.Commit DB.Metric)
-          )
-      )
-  ) ->
+  BenchmarkSeries DB.Commit DB.Metric ->
   Html ()
-generatePlots benchmarks = do
-  unless (Map.null benchmarks) $ h1_ "Plots"
-  for_ (zip [0 :: Int ..] (Map.toList benchmarks)) \(b_i, (subject, tests)) -> do
-    h2_ $ toHtml subject
-    let labels :: Set DB.Commit =
-          Set.fromList $ concatMap (concatMap Map.keys . Map.elems) $ Map.elems tests
-    let metrics :: Set Prim.MetricLabel =
-          Set.fromList $ concatMap Map.keys $ Map.elems tests
-    -- Produce a chart for each type of metric.
-    div_ [style_ "display: flex; flex-wrap: wrap;"] do
-      for_ (zip [0 :: Int ..] (toList metrics)) \(m_i, metricLabel) -> do
-        let dataSets =
-              map (second (maybe [] Map.elems . Map.lookup metricLabel)) $
-                Map.toList tests
-        let (plotData, layout) = makePlotlyConfig metricLabel labels dataSets
-        chart_ (T.pack (show b_i) <> "-" <> T.pack (show m_i)) plotData layout
-
-makePlotlyConfig ::
-  Prim.MetricLabel ->
-  Set DB.Commit ->
-  [(Set Prim.GeneralFactor, [DB.Metric])] ->
-  (Value, Value)
-makePlotlyConfig metricName commits dataSets =
-  (toJSON traces, layout)
-  where
-    commitLabels = List.map (T.take 8 . (coerce :: Prim.Hash -> Text) . (.commitHash)) (Set.toList commits)
-    traces =
-      [ object
-          [ "x" .= commitLabels,
-            "y" .= fillLeft (Set.size commits) Null (map (toJSON . (.metricMean)) metrics :: [Value]),
-            "type" .= ("scatter" :: Text),
-            "mode" .= ("lines+markers" :: Text),
-            "name" .= factorsSmall factors,
-            "line" .= object ["color" .= color]
-          ]
-        | ((factors, metrics), color) <- zip dataSets $ cycle colors
-      ]
-    layout =
-      object
-        [ "title"
-            .= object
-              [ "text" .= coerce @_ @Text metricName,
-                "font" .= object ["family" .= ("monospace" :: Text), "size" .= (16 :: Int)]
-              ],
-          "xaxis"
-            .= object
-              [ "title" .= ("" :: Text),
-                "tickfont" .= object ["family" .= ("monospace" :: Text)]
-              ],
-          "yaxis"
-            .= object
-              [ "title" .= coerce @_ @Text metricName,
-                "rangemode" .= ("tozero" :: Text),
-                "tickfont" .= object ["family" .= ("monospace" :: Text)]
-              ],
-          "font" .= object ["family" .= ("monospace" :: Text)],
-          "hovermode" .= ("x unified" :: Text),
-          "showlegend" .= True,
-          "legend" .= object ["x" .= (1 :: Int), "y" .= (0 :: Int), "xanchor" .= ("right" :: Text), "bgcolor" .= ("rgba(0,0,0,0)" :: Text), "font" .= object ["color" .= ("rgba(0,0,0,0.4)" :: Text)]],
-          "margin" .= object ["t" .= (40 :: Int), "b" .= (40 :: Int), "l" .= (60 :: Int), "r" .= (20 :: Int)]
-        ]
-    colors :: [Text] =
-      T.words
-        "#4394E5 #87BB62 #876FD4 #F5921B"
-
-fillLeft :: Int -> a -> [a] -> [a]
-fillLeft n x xs = replicate (n - length xs) x <> xs
+generatePlots = generateCommitPlots
 
 getCommitR :: Prim.Hash -> Handler (Html ())
 getCommitR hash = do

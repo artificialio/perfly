@@ -25,6 +25,7 @@ library
       Perf.Web.Dispatch
       Perf.Web.Foundation
       Perf.Web.Layout
+      Perf.Web.Plot
       Perf.Web.Routes
       Yesod.Lucid
   other-modules:
@@ -65,6 +66,61 @@ library
     , persistent
     , persistent-sqlite
     , persistent-template
+    , resourcet
+    , rio
+    , text
+    , time
+    , transformers
+    , unix
+    , unliftio
+    , wai
+    , wai-extra
+    , warp
+    , yesod
+  default-language: GHC2021
+
+executable benchmark-display
+  main-is: app/BenchmarkDisplay.hs
+  other-modules:
+      Paths_perfly
+  default-extensions:
+      BlockArguments
+      OverloadedStrings
+      DuplicateRecordFields
+      NamedFieldPuns
+      DeriveGeneric
+      DerivingStrategies
+      DeriveAnyClass
+      TypeApplications
+      OverloadedRecordDot
+      ViewPatterns
+      LambdaCase
+      ExplicitNamespaces
+      QuasiQuotes
+      TypeFamilies
+  ghc-options: -Wall -threaded -rtsopts -with-rtsopts=-N
+  build-depends:
+      aeson
+    , base
+    , bytestring
+    , containers
+    , criterion-measurement
+    , directory
+    , exceptions
+    , filepath
+    , formatting
+    , hspec-discover
+    , hspec-expectations-lifted
+    , http-types
+    , lucid2
+    , monad-logger
+    , mtl
+    , optparse-applicative
+    , perfly
+    , persistent
+    , persistent-sqlite
+    , persistent-template
+    , process
     , resourcet
     , rio
     , text
