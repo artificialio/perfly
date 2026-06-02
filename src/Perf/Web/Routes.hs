@@ -40,7 +40,7 @@ getBranchesR = do
   branches <-
     fmap (List.filter (not . T.isPrefixOf "gh-readonly-queue/" . (.entityVal.branchName))) $
       db $
-        selectList @DB.Branch [DB.BranchName !=. "master"] [Desc DB.BranchCreatedAt]
+        selectList @DB.Branch [DB.BranchName !=. "master"] [Desc DB.BranchCreatedAt, LimitTo 1000]
   lucid do
     defaultLayout_ "Performance" do
       ul_ $
