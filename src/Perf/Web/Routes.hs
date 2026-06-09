@@ -19,7 +19,7 @@ import Perf.DB.Materialize
 import Perf.Types.DB qualified as DB
 import Perf.Types.External qualified as EX
 import Perf.Types.Prim qualified as Prim
-import Perf.Types.Web 
+import Perf.Types.Web
 import Perf.Web.Db
 import Perf.Web.Foundation
 import Perf.Web.Layout
@@ -51,12 +51,58 @@ getBranchesR = do
 
 getBranchR :: Text -> Handler (Html ())
 getBranchR name = do
-  mbranch <- db $ selectFirst [DB.BranchName ==. name] []
-  case mbranch of
-    Nothing -> notFound
-    Just (Entity branchId branch) -> do
-      mmaxGraph <- fmap (>>= (RIO.readMaybe @Int . T.unpack)) $ lookupGetParam "limit"
-      let maxGraph :: Int = fromMaybe 28 $ mmaxGraph
+   branchId <- getBranchByName name
+   masterBranchId <- getBranchByName "master"
+   mmaxGraph <- fmap (>>= (RIO.readMaybe @Int . T.unpack)) $ lookupGetParam "limit"
+   let maxGraph :: Int = fromMaybe 28 $ mmaxGraph
+   branchCommits <- getCommitsOfBranch maxGraph branchId
+   masterCommits <- getCommitsOfBranch 1 masterBranchId
+   let commits = List.nubOrd $ branchCommits <> masterCommits
+   mbenchmarks <- db $ for (NonEmpty.nonEmpty $ reverse commits) materializeCommits
+   lucid do
+     defaultLayout_ name do
+       for_ mbenchmarks $ generalizeHtmlT . generatePlots
+       h1_ "Commits"
+       table_ do
+         let prevCommits = map Just (drop 1 commits) <> repeat Nothing
+         for_ (zip commits prevCommits) \(Entity _ commit, mprev) -> do
+           let mprevious = fmap (.entityVal) mprev
+           url <- asks (.url)
+           tr_ do
+             td_ $
+               small_ $
+                 toHtml $
+                   show commit.commitCreatedAt
+             let -- Is this commit on master, and master is another, different branch?
+                 isMasterOther = elem commit.commitHash (fmap ((.commitHash) . entityVal) masterCommits)
+                   && branchId /= masterBranchId
+             td_ do
+               a_ [href_ $ url $ if isMasterOther then CommitR commit.commitHash else BranchCommitR name commit.commitHash] $
+                 code_ $
+                   toHtml $
+                     commit.commitHash
+               when isMasterOther do
+                 " (master)"
+             td_ $
+               for_ mprevious \previous ->
+                 a_
+                   [ href_ $
+                       url $
+                         CompareCommitsR previous.commitHash commit.commitHash
+                   ]
+                   $ "compare previous"
+       p_ $ small_ do
+         "(limited to most recent "
+         toHtml $ show maxGraph
+         " commits)"
+
+  where
+    getBranchByName n = do
+      mbranch <- db $ selectFirst [DB.BranchName ==. n] []
+      case mbranch of
+        Nothing -> notFound
+        Just (Entity branchId _) -> pure branchId
+    getCommitsOfBranch maxGraph branchId = do
       mappings <-
         db $
           selectList
@@ -64,38 +110,7 @@ getBranchR name = do
             [Desc DB.MapBranchCommitId, LimitTo maxGraph]
       commits <- fmap catMaybes $ RIO.for mappings \mapping ->
         db $ selectFirst [DB.CommitId ==. mapping.entityVal.mapBranchCommitCommitId] []
-      mbenchmarks <- db $ for (NonEmpty.nonEmpty $ reverse commits) materializeCommits
-      lucid do
-        defaultLayout_ branch.branchName do
-          for_ mbenchmarks $ generalizeHtmlT . generatePlots
-          h1_ "Commits"
-          table_ do
-            let prevCommits = map Just (drop 1 commits) <> repeat Nothing
-            for_ (zip commits prevCommits) \(Entity _ commit, mprev) -> do
-              let mprevious = fmap (.entityVal) mprev
-              url <- asks (.url)
-              tr_ do
-                td_ $
-                  small_ $
-                    toHtml $
-                      show commit.commitCreatedAt
-                td_ $
-                  a_ [href_ $ url $ BranchCommitR name commit.commitHash] $
-                    code_ $
-                      toHtml $
-                        commit.commitHash
-                td_ $
-                  for_ mprevious \previous ->
-                    a_
-                      [ href_ $
-                          url $
-                            CompareCommitsR previous.commitHash commit.commitHash
-                      ]
-                      $ "compare previous"
-          p_ $ small_ do
-            "(limited to most recent "
-            toHtml $ show maxGraph
-            " commits)"
+      pure commits
 
 generatePlots ::
   BenchmarkSeries DB.Commit DB.Metric ->
