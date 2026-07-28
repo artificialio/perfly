@@ -1,5 +1,6 @@
 module Perf.DB.Materialize where
 
+import Data.Maybe (catMaybes)
 import qualified Data.List as List
 import Data.List.NonEmpty (NonEmpty)
 import qualified Data.List.NonEmpty as NonEmpty
@@ -24,6 +25,39 @@ data DisplayMetric = DisplayMetric
   { mean :: Double
   }
   deriving (Eq, Show)
+
+-- | Most recent commits on a branch, returned in historical order (oldest first).
+loadBranchCommits :: Text -> Int -> DB.DB [Entity DB.Commit]
+loadBranchCommits branchName limit = do
+  mbranch <- selectFirst [DB.BranchName ==. branchName] []
+  case mbranch of
+    Nothing -> pure []
+    Just (Entity branchId _) -> do
+      mappings <-
+        selectList
+          [DB.MapBranchCommitBranchId ==. branchId]
+          [Desc DB.MapBranchCommitId, LimitTo limit]
+      commits <-
+        mapM
+          (\mapping -> selectFirst [DB.CommitId ==. mapping.entityVal.mapBranchCommitCommitId] [])
+          mappings
+      pure $ reverse $ catMaybes commits
+
+-- | Merge master metrics into branch subjects only (drop master-only subjects).
+mergeMasterIntoBranch ::
+  Ord key =>
+  BenchmarkSeries key metric ->
+  BenchmarkSeries key metric ->
+  BenchmarkSeries key metric
+mergeMasterIntoBranch masterBenchmarks branchBenchmarks =
+  Map.mapWithKey
+    ( \subject branchTests ->
+        case Map.lookup subject masterBenchmarks of
+          Nothing -> branchTests
+          Just masterTests ->
+            Map.unionWith (Map.unionWith Map.union) masterTests branchTests
+    )
+    branchBenchmarks
 
 -- Materialize a set of commits into a data set we can work with.
 materializeCommits ::

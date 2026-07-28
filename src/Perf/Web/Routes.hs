@@ -19,7 +19,7 @@ import Perf.DB.Materialize
 import Perf.Types.DB qualified as DB
 import Perf.Types.External qualified as EX
 import Perf.Types.Prim qualified as Prim
-import Perf.Types.Web 
+import Perf.Types.Web
 import Perf.Web.Db
 import Perf.Web.Foundation
 import Perf.Web.Layout
@@ -54,24 +54,39 @@ getBranchR name = do
   mbranch <- db $ selectFirst [DB.BranchName ==. name] []
   case mbranch of
     Nothing -> notFound
-    Just (Entity branchId branch) -> do
+    Just (Entity _branchId branch) -> do
       mmaxGraph <- fmap (>>= (RIO.readMaybe @Int . T.unpack)) $ lookupGetParam "limit"
       let maxGraph :: Int = fromMaybe 28 $ mmaxGraph
-      mappings <-
-        db $
-          selectList
-            [DB.MapBranchCommitBranchId ==. branchId]
-            [Desc DB.MapBranchCommitId, LimitTo maxGraph]
-      commits <- fmap catMaybes $ RIO.for mappings \mapping ->
-        db $ selectFirst [DB.CommitId ==. mapping.entityVal.mapBranchCommitCommitId] []
-      mbenchmarks <- db $ for (NonEmpty.nonEmpty $ reverse commits) materializeCommits
+          isMaster = name == "master"
+      branchCommitEntities <- db $ loadBranchCommits name maxGraph
+      -- Newest-first for the commits table (historical order is reversed).
+      let commitsNewestFirst = reverse branchCommitEntities
+      masterCommitEntities <-
+        if isMaster
+          then pure []
+          else db $ loadBranchCommits "master" 10
+      let masterCtx =
+            if isMaster
+              then MasterComparisonDisabled
+              else MasterComparisonEnabled (map entityVal masterCommitEntities)
+          branchCommits = map entityVal branchCommitEntities
+      mbenchmarks <- db do
+        branchBenchmarks <- for (NonEmpty.nonEmpty branchCommitEntities) materializeCommits
+        masterBenchmarks <- for (NonEmpty.nonEmpty masterCommitEntities) materializeCommits
+        pure $
+          case (branchBenchmarks, masterBenchmarks) of
+            (Nothing, _) -> Nothing
+            (Just branchName, Nothing) -> Just branchName
+            (Just branchName, Just master) -> Just (mergeMasterIntoBranch master branchName)
       lucid do
         defaultLayout_ branch.branchName do
-          for_ mbenchmarks $ generalizeHtmlT . generatePlots
+          for_ mbenchmarks \benchmarks ->
+            generalizeHtmlT $
+              generateCommitPlotsWith masterCtx branchCommits benchmarks
           h1_ "Commits"
           table_ do
-            let prevCommits = map Just (drop 1 commits) <> repeat Nothing
-            for_ (zip commits prevCommits) \(Entity _ commit, mprev) -> do
+            let prevCommits = map Just (drop 1 commitsNewestFirst) <> repeat Nothing
+            for_ (zip commitsNewestFirst prevCommits) \(Entity _ commit, mprev) -> do
               let mprevious = fmap (.entityVal) mprev
               url <- asks (.url)
               tr_ do
@@ -96,11 +111,6 @@ getBranchR name = do
             "(limited to most recent "
             toHtml $ show maxGraph
             " commits)"
-
-generatePlots ::
-  BenchmarkSeries DB.Commit DB.Metric ->
-  Html ()
-generatePlots = generateCommitPlots
 
 getCommitR :: Prim.Hash -> Handler (Html ())
 getCommitR hash = do
