@@ -93,6 +93,7 @@ cabal run benchmark-display -- --output benchmark.html run-1.json run-2.json
 
 Notes:
 
+- To get the sqlite DB file, use a command like this: `scp brossa.io:/root/perfly/perf.sqlite3 .` (you will need permissions to access `brossa.io` via ssh).
 - The generated file defaults to `benchmark-display.html`.
 - After writing, the tool runs `open benchmark-display.html` on macOS
   (or `xdg-open` on Linux).

@@ -23,7 +23,7 @@ chart_ opts = do
   div_
     [ id_ opts.chartId,
       class_ "benchmark-plot",
-      style_ $ "height: " <> T.pack (show opts.heightPx) <> "px; max-width: 400px; width: 100%;",
+      style_ $ "height: " <> T.pack (show opts.heightPx) <> "px;",
       makeAttributes "data-full" (encode' opts.plotData),
       makeAttributes "data-layout" (encode' opts.layout),
       makeAttributes "data-master-count" (T.pack (show opts.masterCount))

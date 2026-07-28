@@ -34,11 +34,19 @@ headCommon_ :: Monad m => Text -> HtmlT m ()
 headCommon_ title =
   head_ do
     meta_ [charset_ "utf-8"]
+    meta_ [name_ "viewport", content_ "width=device-width, initial-scale=1"]
     title_ $ toHtml title
     style_ $
       T.unwords
-        [ "body {font-family: monospace; margin: 0 auto; max-width: 800px;}",
-          "table.metrics td, table.metrics th {border: 1px solid black; padding: 2px;}"
+        [ "body {font-family: monospace; margin: 24px; max-width: none;}",
+          "table.metrics td, table.metrics th {border: 1px solid black; padding: 2px;}",
+          ".benchmark-subject {margin-bottom: 2rem;}",
+          ".chart-grid {display: grid; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); gap: 1.75rem 12px; align-items: start;}",
+          ".chart-cell {min-width: 0; margin-bottom: 0.5rem;}",
+          ".benchmark-plot {width: 100%; min-height: 340px; border: 1px solid #d1d5db; box-sizing: border-box;}",
+          ".factor-lines {margin-top: 2px; margin-bottom: 0.75rem; color: rgba(0,0,0,0.55); font-size: 0.92rem; line-height: 1.35;}",
+          ".factor-line {margin-top: 4px; display: flex; align-items: center; gap: 8px;}",
+          ".factor-swatch {width: 14px; height: 2px; flex: 0 0 auto; background: currentColor;}"
         ]
     script_
       [ src_ "https://cdn.jsdelivr.net/npm/plotly.js-dist-min@2.35.2/plotly.min.js",

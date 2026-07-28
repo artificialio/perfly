@@ -16,7 +16,7 @@ import Perf.Types.DB qualified as DB
 import Perf.Types.Prim qualified as Prim
 import Perf.Web.Chart
 
--- | Whether the "show master branch commits" control is available.
+-- | Whether the "Show master branch commits" control is available.
 data MasterPlotContext key
   = MasterComparisonDisabled
   | MasterComparisonEnabled [key]
@@ -82,7 +82,7 @@ generatePlotsWith masterCtx branchKeys renderKey metricMean benchmarks = do
       ]
       do
         h2_ $ toHtml subject
-        div_ [style_ "display: flex; flex-wrap: wrap;"] do
+        div_ [class_ "chart-grid"] do
           Foldable.for_ (zip [0 :: Int ..] (Set.toList metrics)) \(metricIdx, metricLabel) -> do
             let dataSets =
                   flip map (Map.toList tests) \(factors, allMetrics) ->
@@ -90,16 +90,18 @@ generatePlotsWith masterCtx branchKeys renderKey metricMean benchmarks = do
                 labels = map renderKey orderedKeys
                 (plotData, layout) = makePlotlyConfig metricLabel labels dataSets
                 chartId = T.pack (show benchmarkIdx) <> "-" <> T.pack (show metricIdx)
-                legendLines = length dataSets
-                chartHeight = 280 + min 320 (40 + legendLines * 16)
-            chart_
-              ChartOptions
-                { chartId,
-                  plotData,
-                  layout,
-                  masterCount,
-                  heightPx = chartHeight
-                }
+                legendEntries =
+                  zip (cycle plotColors) (map (factorsSmall . fst) dataSets)
+            div_ [class_ "chart-cell"] do
+              chart_
+                ChartOptions
+                  { chartId,
+                    plotData,
+                    layout,
+                    masterCount,
+                    heightPx = 360
+                  }
+              factorLegend_ legendEntries
   -- Script must run after plot containers are in the DOM.
   unless (Map.null benchmarks) $ script_ plotControlsScript
   where
@@ -134,7 +136,7 @@ plotControls_ masterEnabled = do
           style_ "display: flex; align-items: center; gap: 0.4rem; white-space: nowrap;"
         ]
         do
-          "show master branch commits:"
+          "Show master branch commits:"
           select_
             ( [ id_ "master-commits",
                 style_ "font-family: monospace; padding: 0.25rem;"
@@ -213,12 +215,11 @@ makePlotlyConfig metricName labels dataSets =
             "type" .= ("scatter" :: Text),
             "mode" .= ("lines+markers" :: Text),
             "name" .= factorsSmall factors,
-            "line" .= object ["color" .= color]
+            "line" .= object ["color" .= color, "width" .= (2 :: Int)],
+            "marker" .= object ["size" .= (7 :: Int), "color" .= color]
           ]
-        | ((factors, series), color) <- zip dataSets $ cycle colors
+        | ((factors, series), color) <- zip dataSets $ cycle plotColors
       ]
-    legendLines = length dataSets
-    bottomMargin = min 320 (40 + legendLines * 16)
     layout =
       object
         [ "title"
@@ -229,33 +230,33 @@ makePlotlyConfig metricName labels dataSets =
           "xaxis"
             .= object
               [ "title" .= ("" :: Text),
+                "tickangle" .= (-30 :: Int),
+                "automargin" .= True,
                 "tickfont" .= object ["family" .= ("monospace" :: Text)]
               ],
           "yaxis"
             .= object
               [ "title" .= coerce @_ @Text metricName,
                 "rangemode" .= ("tozero" :: Text),
+                "automargin" .= True,
                 "tickfont" .= object ["family" .= ("monospace" :: Text)]
               ],
           "font" .= object ["family" .= ("monospace" :: Text)],
           "hovermode" .= ("x unified" :: Text),
-          "showlegend" .= True,
-          "legend"
-            .= object
-              [ "orientation" .= ("v" :: Text),
-                "x" .= (0 :: Double),
-                "y" .= (0 :: Double),
-                "xanchor" .= ("left" :: Text),
-                "yanchor" .= ("bottom" :: Text),
-                "yref" .= ("container" :: Text),
-                "xref" .= ("paper" :: Text),
-                "bgcolor" .= ("rgba(0,0,0,0)" :: Text),
-                "font" .= object ["color" .= ("rgba(0,0,0,0.55)" :: Text), "size" .= (11 :: Int)]
-              ],
-          "margin" .= object ["t" .= (40 :: Int), "b" .= bottomMargin, "l" .= (60 :: Int), "r" .= (20 :: Int)]
+          "showlegend" .= False,
+          "margin" .= object ["t" .= (40 :: Int), "b" .= (56 :: Int), "l" .= (64 :: Int), "r" .= (40 :: Int)]
         ]
-    colors :: [Text] =
-      T.words "#4394E5 #87BB62 #876FD4 #F5921B"
+
+plotColors :: [Text]
+plotColors = T.words "#4394E5 #87BB62 #876FD4 #F5921B #1f77b4 #ff7f0e #2ca02c #d62728"
+
+factorLegend_ :: [(Text, Text)] -> Html ()
+factorLegend_ entries =
+  div_ [class_ "factor-lines"] do
+    Foldable.for_ entries \(color, name) ->
+      div_ [class_ "factor-line"] do
+        span_ [class_ "factor-swatch", style_ ("background-color: " <> color)] (pure ())
+        span_ (toHtml name)
 
 factorSmall :: Prim.GeneralFactor -> Text
 factorSmall factor = T.concat [T.strip factor.name, "=", T.strip factor.value]
