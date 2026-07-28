@@ -92,14 +92,11 @@ generatePlotsWith masterCtx branchKeys renderKey metricMean benchmarks = do
   Foldable.for_ (zip [0 :: Int ..] (Map.toList benchmarks)) \(benchmarkIdx, (subject, tests)) -> do
     let metrics :: Set Prim.MetricLabel =
           Set.fromList $ concatMap Map.keys $ Map.elems tests
-        searchText =
-          T.toLower $
-            T.unwords $
-              subjectText subject : map metricText (Set.toList metrics)
     div_
       [ class_ "benchmark-subject",
         makeAttributes "data-plot-title" (subjectText subject),
-        makeAttributes "data-search-text" searchText
+        -- Match the visible subject heading only (not metric labels like "time").
+        makeAttributes "data-search-text" (T.toLower (subjectText subject))
       ]
       do
         h2_ $ toHtml subject
@@ -123,8 +120,10 @@ generatePlotsWith masterCtx branchKeys renderKey metricMean benchmarks = do
                     heightPx = 360
                   }
               factorLegend_ chartId legendEntries
-  -- Script must run after plot containers are in the DOM.
-  unless (Map.null benchmarks) $ script_ plotControlsScript
+  unless (Map.null benchmarks) do
+    style_ masterTickStyles
+    -- Script must run after plot containers are in the DOM.
+    script_ plotControlsScript
   where
     toSeries keys metricMap =
       flip map keys \key ->
@@ -171,6 +170,20 @@ plotControls_ masterEnabled defaultMasterShow options = do
                       <> [makeAttributes "selected" "selected" | n == defaultMasterShow]
                   )
                   (toHtml (show n))
+
+-- | Color the first N x-axis ticks green via CSS (survives Plotly resize redraws).
+masterTickStyles :: Text
+masterTickStyles =
+  T.unlines
+    [ ".benchmark-plot[data-shown-master=\""
+        <> nText
+        <> "\"] g.xtick:nth-child(-n+"
+        <> nText
+        <> ") text { fill: #15803d !important; }"
+    | n <- masterCommitOptions True
+    , n > 0
+    , let nText = T.pack (show n)
+    ]
 
 plotControlsScript :: Text
 plotControlsScript =
@@ -224,14 +237,6 @@ plotControlsScript =
         syncLegendUI(chartEl);
         return Plotly.restyle(chartEl, {visible: vis.slice()});
       }
-      function colorMasterTicks(plotEl, showMaster) {
-        const shown = Math.max(0, showMaster);
-        plotEl.querySelectorAll('g.xtick text').forEach((node, i) => {
-          const color = i < shown ? '#15803d' : '#111111';
-          node.style.fill = color;
-          node.setAttribute('fill', color);
-        });
-      }
       function redrawPlots() {
         const show = masterShow();
         document.querySelectorAll('.benchmark-plot').forEach((el) => {
@@ -241,10 +246,8 @@ plotControlsScript =
           const data = slicePlotData(fullData, masterCount, show);
           ensureVisibility(el.id, data.length);
           const shownMaster = Math.min(show, masterCount);
-          const finish = () => {
-            colorMasterTicks(el, shownMaster);
-            return applyVisibility(el).then(() => requestAnimationFrame(() => colorMasterTicks(el, shownMaster)));
-          };
+          el.setAttribute('data-shown-master', String(shownMaster));
+          const finish = () => applyVisibility(el);
           const plotted = el.getAttribute('data-plotted') === '1'
             ? Plotly.react(el, data, layout, config)
             : Plotly.newPlot(el, data, layout, config).then(() => el.setAttribute('data-plotted', '1'));
