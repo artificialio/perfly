@@ -38,15 +38,18 @@ headCommon_ title =
     title_ $ toHtml title
     style_ $
       T.unwords
-        [ "body {font-family: monospace; margin: 24px; max-width: none;}",
+        [ "body {font-family: monospace; margin: 24px; max-width: none; background: #f6f7f9; color: #111827;}",
           "table.metrics td, table.metrics th {border: 1px solid black; padding: 2px;}",
-          ".benchmark-subject {margin-bottom: 2rem;}",
+          ".benchmark-subject {background: #ffffff; border: 1px solid #e5e7eb; border-radius: 10px; padding: 14px 14px 18px 14px; margin-bottom: 1.25rem;}",
+          ".benchmark-subject > h2 {margin: 0 0 8px 0;}",
           ".chart-grid {display: grid; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); gap: 1.75rem 12px; align-items: start;}",
           ".chart-cell {min-width: 0; margin-bottom: 0.5rem;}",
-          ".benchmark-plot {width: 100%; min-height: 340px; border: 1px solid #d1d5db; box-sizing: border-box;}",
-          ".factor-lines {margin-top: 2px; margin-bottom: 0.75rem; color: rgba(0,0,0,0.55); font-size: 0.92rem; line-height: 1.35;}",
-          ".factor-line {margin-top: 4px; display: flex; align-items: center; gap: 8px;}",
-          ".factor-swatch {width: 14px; height: 2px; flex: 0 0 auto; background: currentColor;}"
+          ".benchmark-plot {width: 100%; min-height: 340px;}",
+          ".factor-lines {margin-top: 2px; margin-bottom: 0.75rem; color: #6b7280; font-size: 0.92rem; line-height: 1.35;}",
+          ".factor-line {margin-top: 4px;}",
+          ".factor-toggle {border: none; background: transparent; color: #4b5563; cursor: pointer; font: inherit; display: inline-flex; align-items: center; gap: 8px; padding: 0; text-align: left;}",
+          ".factor-toggle.off {opacity: 0.5; text-decoration: line-through;}",
+          ".factor-swatch {width: 14px; height: 2px; border-radius: 2px; flex: 0 0 auto;}"
         ]
     script_
       [ src_ "https://cdn.jsdelivr.net/npm/plotly.js-dist-min@2.35.2/plotly.min.js",

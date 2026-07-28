@@ -58,26 +58,28 @@ getBranchR name = do
       mmaxGraph <- fmap (>>= (RIO.readMaybe @Int . T.unpack)) $ lookupGetParam "limit"
       let maxGraph :: Int = fromMaybe 28 $ mmaxGraph
           isMaster = name == "master"
-      branchCommitEntities <- db $ loadBranchCommits name maxGraph
-      -- Newest-first for the commits table (historical order is reversed).
-      let commitsNewestFirst = reverse branchCommitEntities
-      masterCommitEntities <-
+      masterCommitEntities <- db $ loadBranchCommits "master" maxMasterCommits
+      branchCommitEntities <-
         if isMaster
           then pure []
-          else db $ loadBranchCommits "master" 10
-      let masterCtx =
-            if isMaster
-              then MasterComparisonDisabled
-              else MasterComparisonEnabled (map entityVal masterCommitEntities)
+          else db $ loadBranchCommits name maxGraph
+      -- Newest-first for the commits table (historical order is reversed).
+      let commitsNewestFirst =
+            reverse $
+              if isMaster then masterCommitEntities else branchCommitEntities
+          masterCtx = MasterComparisonEnabled (map entityVal masterCommitEntities)
           branchCommits = map entityVal branchCommitEntities
       mbenchmarks <- db do
-        branchBenchmarks <- for (NonEmpty.nonEmpty branchCommitEntities) materializeCommits
         masterBenchmarks <- for (NonEmpty.nonEmpty masterCommitEntities) materializeCommits
+        branchBenchmarks <- for (NonEmpty.nonEmpty branchCommitEntities) materializeCommits
         pure $
-          case (branchBenchmarks, masterBenchmarks) of
-            (Nothing, _) -> Nothing
-            (Just branchName, Nothing) -> Just branchName
-            (Just branchName, Just master) -> Just (mergeMasterIntoBranch master branchName)
+          case (isMaster, masterBenchmarks, branchBenchmarks) of
+            (True, Nothing, _) -> Nothing
+            (True, Just master, _) -> Just master
+            (False, _, Nothing) -> Nothing
+            (False, Nothing, Just branchSeries) -> Just branchSeries
+            (False, Just master, Just branchSeries) ->
+              Just (mergeMasterIntoBranch master branchSeries)
       lucid do
         defaultLayout_ branch.branchName do
           for_ mbenchmarks \benchmarks ->
@@ -109,7 +111,7 @@ getBranchR name = do
                       $ "compare previous"
           p_ $ small_ do
             "(limited to most recent "
-            toHtml $ show maxGraph
+            toHtml $ show $ if isMaster then maxMasterCommits else maxGraph
             " commits)"
 
 getCommitR :: Prim.Hash -> Handler (Html ())

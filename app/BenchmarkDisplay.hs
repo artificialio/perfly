@@ -99,24 +99,31 @@ loadBenchmarksHtmlFromSqlite :: FilePath -> Text -> Int -> IO (Html ())
 loadBenchmarksHtmlFromSqlite sqlite branch limit =
   runSqlite (T.pack sqlite) do
     runMigration DB.migrateAll
-    branchCommitEntities <- loadBranchCommits branch limit
-    case NonEmpty.nonEmpty branchCommitEntities of
-      Nothing -> pure mempty
-      Just branchCommitsNE -> do
-        let isMaster = branch == "master"
-            branchCommits = map entityVal branchCommitEntities
+    let isMaster = branch == "master"
+    masterCommitEntities <- loadBranchCommits "master" maxMasterCommits
+    branchCommitEntities <-
+      if isMaster
+        then pure []
+        else loadBranchCommits branch limit
+    let masterCtx = MasterComparisonEnabled (map entityVal masterCommitEntities)
+        branchCommits = map entityVal branchCommitEntities
+    case (isMaster, NonEmpty.nonEmpty masterCommitEntities, NonEmpty.nonEmpty branchCommitEntities) of
+      (True, Nothing, _) -> pure mempty
+      (True, Just masterCommitsNE, _) -> do
+        masterBenchmarks <- materializeCommits masterCommitsNE
+        pure $ generateCommitPlotsWith masterCtx [] masterBenchmarks
+      (False, _, Nothing) -> pure mempty
+      (False, Nothing, Just branchCommitsNE) -> do
         branchBenchmarks <- materializeCommits branchCommitsNE
-        if isMaster
-          then pure $ generateCommitPlotsWith MasterComparisonDisabled branchCommits branchBenchmarks
-          else do
-            masterCommitEntities <- loadBranchCommits "master" 10
-            let masterCtx = MasterComparisonEnabled (map entityVal masterCommitEntities)
-            benchmarks <- case NonEmpty.nonEmpty masterCommitEntities of
-              Nothing -> pure branchBenchmarks
-              Just masterCommitsNE -> do
-                masterBenchmarks <- materializeCommits masterCommitsNE
-                pure $ mergeMasterIntoBranch masterBenchmarks branchBenchmarks
-            pure $ generateCommitPlotsWith masterCtx branchCommits benchmarks
+        pure $ generateCommitPlotsWith masterCtx branchCommits branchBenchmarks
+      (False, Just masterCommitsNE, Just branchCommitsNE) -> do
+        masterBenchmarks <- materializeCommits masterCommitsNE
+        branchBenchmarks <- materializeCommits branchCommitsNE
+        pure $
+          generateCommitPlotsWith
+            masterCtx
+            branchCommits
+            (mergeMasterIntoBranch masterBenchmarks branchBenchmarks)
 
 openFile :: FilePath -> IO ()
 openFile path =

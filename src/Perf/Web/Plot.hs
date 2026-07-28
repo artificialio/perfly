@@ -20,7 +20,15 @@ import Perf.Web.Chart
 data MasterPlotContext key
   = MasterComparisonDisabled
   | MasterComparisonEnabled [key]
-  -- ^ Master keys in historical order (oldest first), at most 10.
+  -- ^ Master keys in historical order (oldest first), at most 'maxMasterCommits'.
+
+-- | Selectable values for the master-commits control.
+masterCommitOptions :: [Int]
+masterCommitOptions = [0, 1, 2, 3, 5, 10, 20, 30, 50, 100]
+
+-- | How many master commits to load for the control (largest option).
+maxMasterCommits :: Int
+maxMasterCommits = maximum masterCommitOptions
 
 generateCommitPlots :: BenchmarkSeries DB.Commit DB.Metric -> Html ()
 generateCommitPlots benchmarks =
@@ -67,7 +75,12 @@ generatePlotsWith masterCtx branchKeys renderKey metricMean benchmarks = do
       masterEnabled = case masterCtx of
         MasterComparisonDisabled -> False
         MasterComparisonEnabled {} -> True
-  unless (Map.null benchmarks) $ plotControls_ masterEnabled
+      -- On master itself there is no trailing branch series.
+      defaultMasterShow
+        | masterEnabled && null branchKeys = 20
+        | masterEnabled = 1
+        | otherwise = 0
+  unless (Map.null benchmarks) $ plotControls_ masterEnabled defaultMasterShow
   Foldable.for_ (zip [0 :: Int ..] (Map.toList benchmarks)) \(benchmarkIdx, (subject, tests)) -> do
     let metrics :: Set Prim.MetricLabel =
           Set.fromList $ concatMap Map.keys $ Map.elems tests
@@ -101,7 +114,7 @@ generatePlotsWith masterCtx branchKeys renderKey metricMean benchmarks = do
                     masterCount,
                     heightPx = 360
                   }
-              factorLegend_ legendEntries
+              factorLegend_ chartId legendEntries
   -- Script must run after plot containers are in the DOM.
   unless (Map.null benchmarks) $ script_ plotControlsScript
   where
@@ -118,8 +131,8 @@ collectKeys benchmarks =
         concatMap Map.elems $
           Map.elems benchmarks
 
-plotControls_ :: Bool -> Html ()
-plotControls_ masterEnabled = do
+plotControls_ :: Bool -> Int -> Html ()
+plotControls_ masterEnabled defaultMasterShow = do
   div_
     [ class_ "plot-controls",
       style_ "display: flex; flex-wrap: wrap; gap: 1rem; align-items: center; margin: 1rem 0;"
@@ -129,25 +142,25 @@ plotControls_ masterEnabled = do
         [ type_ "search",
           id_ "plot-search",
           placeholder_ "Search in plot title",
-          style_ "flex: 1; min-width: 16rem; padding: 0.35rem 0.5rem; font-family: monospace;"
+          style_ "flex: 1 1 30%; min-width: 200px; max-width: 30%; padding: 0.35rem 0.5rem; font-family: monospace;"
         ]
       label_
         [ for_ "master-commits",
-          style_ "display: flex; align-items: center; gap: 0.4rem; white-space: nowrap;"
+          style_ "display: flex; align-items: center; gap: 0.4rem; white-space: nowrap; color: #15803d;"
         ]
         do
           "Show master branch commits:"
           select_
             ( [ id_ "master-commits",
-                style_ "font-family: monospace; padding: 0.25rem;"
+                style_ "font-family: monospace; padding: 0.25rem; color: #111111;"
               ]
                 <> [makeAttributes "disabled" "disabled" | not masterEnabled]
             )
             do
-              forM_ ([0, 1, 2, 3, 5, 10] :: [Int]) \n ->
+              forM_ masterCommitOptions \n ->
                 option_
                   ( [value_ (T.pack (show n))]
-                      <> [makeAttributes "selected" "selected" | n == 0]
+                      <> [makeAttributes "selected" "selected" | n == defaultMasterShow]
                   )
                   (toHtml (show n))
 
@@ -158,6 +171,8 @@ plotControlsScript =
       "  const search = document.getElementById('plot-search');",
       "  const masterSelect = document.getElementById('master-commits');",
       "  const config = {responsive: true, modeBarButtonsToRemove: ['select2d', 'lasso2d']};",
+      "  const traceVisibility = new Map();",
+      "  const singleClickTimers = new Map();",
       "  function applySearch() {",
       "    if (!search) return;",
       "    const q = (search.value || '').trim().toLowerCase();",
@@ -178,6 +193,37 @@ plotControlsScript =
       "      y: (trace.y || []).slice(start)",
       "    }));",
       "  }",
+      "  function ensureVisibility(chartId, traceCount) {",
+      "    let vis = traceVisibility.get(chartId);",
+      "    if (!vis || vis.length !== traceCount) {",
+      "      vis = Array.from({length: traceCount}, () => true);",
+      "      traceVisibility.set(chartId, vis);",
+      "    }",
+      "    return vis;",
+      "  }",
+      "  function syncLegendUI(chartEl) {",
+      "    const vis = traceVisibility.get(chartEl.id) || [];",
+      "    const root = chartEl.parentElement;",
+      "    if (!root) return;",
+      "    root.querySelectorAll('.factor-toggle').forEach((btn, i) => {",
+      "      btn.classList.toggle('off', !vis[i]);",
+      "    });",
+      "  }",
+      "  function applyVisibility(chartEl) {",
+      "    const count = (chartEl.data && chartEl.data.length) || 0;",
+      "    if (!count) return Promise.resolve();",
+      "    const vis = ensureVisibility(chartEl.id, count);",
+      "    syncLegendUI(chartEl);",
+      "    return Plotly.restyle(chartEl, {visible: vis.slice()});",
+      "  }",
+      "  function colorMasterTicks(plotEl, showMaster) {",
+      "    const shown = Math.max(0, showMaster);",
+      "    plotEl.querySelectorAll('g.xtick text').forEach((node, i) => {",
+      "      const color = i < shown ? '#15803d' : '#111111';",
+      "      node.style.fill = color;",
+      "      node.setAttribute('fill', color);",
+      "    });",
+      "  }",
       "  function redrawPlots() {",
       "    const show = masterShow();",
       "    document.querySelectorAll('.benchmark-plot').forEach((el) => {",
@@ -185,14 +231,50 @@ plotControlsScript =
       "      const layout = JSON.parse(el.getAttribute('data-layout') || '{}');",
       "      const masterCount = parseInt(el.getAttribute('data-master-count') || '0', 10) || 0;",
       "      const data = slicePlotData(fullData, masterCount, show);",
-      "      if (el.getAttribute('data-plotted') === '1') {",
-      "        Plotly.react(el, data, layout, config);",
-      "      } else {",
-      "        Plotly.newPlot(el, data, layout, config);",
-      "        el.setAttribute('data-plotted', '1');",
-      "      }",
+      "      ensureVisibility(el.id, data.length);",
+      "      const shownMaster = Math.min(show, masterCount);",
+      "      const finish = () => {",
+      "        colorMasterTicks(el, shownMaster);",
+      "        return applyVisibility(el).then(() => requestAnimationFrame(() => colorMasterTicks(el, shownMaster)));",
+      "      };",
+      "      const plotted = el.getAttribute('data-plotted') === '1'",
+      "        ? Plotly.react(el, data, layout, config)",
+      "        : Plotly.newPlot(el, data, layout, config).then(() => el.setAttribute('data-plotted', '1'));",
+      "      Promise.resolve(plotted).then(finish);",
       "    });",
       "  }",
+      "  function isolateTrace(chartEl, onlyIdx) {",
+      "    const count = (chartEl.data && chartEl.data.length) || 0;",
+      "    const vis = ensureVisibility(chartEl.id, count);",
+      "    for (let i = 0; i < vis.length; i++) vis[i] = i === onlyIdx;",
+      "    applyVisibility(chartEl);",
+      "  }",
+      "  document.addEventListener('click', (e) => {",
+      "    const btn = e.target.closest('.factor-toggle');",
+      "    if (!btn) return;",
+      "    const chartId = btn.getAttribute('data-chart-id');",
+      "    const traceIdx = parseInt(btn.getAttribute('data-trace-idx'), 10);",
+      "    const chartEl = chartId ? document.getElementById(chartId) : null;",
+      "    if (!chartEl || !Number.isFinite(traceIdx)) return;",
+      "    if (e.detail === 2) {",
+      "      const prev = singleClickTimers.get(btn);",
+      "      if (prev) clearTimeout(prev);",
+      "      singleClickTimers.delete(btn);",
+      "      isolateTrace(chartEl, traceIdx);",
+      "      return;",
+      "    }",
+      "    if (e.detail === 1) {",
+      "      const prev = singleClickTimers.get(btn);",
+      "      if (prev) clearTimeout(prev);",
+      "      singleClickTimers.set(btn, setTimeout(() => {",
+      "        singleClickTimers.delete(btn);",
+      "        const count = (chartEl.data && chartEl.data.length) || 0;",
+      "        const vis = ensureVisibility(chartEl.id, count);",
+      "        vis[traceIdx] = !vis[traceIdx];",
+      "        applyVisibility(chartEl);",
+      "      }, 280));",
+      "    }",
+      "  });",
       "  if (search) search.addEventListener('input', applySearch);",
       "  if (masterSelect) masterSelect.addEventListener('change', redrawPlots);",
       "  applySearch();",
@@ -232,7 +314,7 @@ makePlotlyConfig metricName labels dataSets =
               [ "title" .= ("" :: Text),
                 "tickangle" .= (-30 :: Int),
                 "automargin" .= True,
-                "tickfont" .= object ["family" .= ("monospace" :: Text)]
+                "tickfont" .= object ["family" .= ("monospace" :: Text), "color" .= ("#111111" :: Text)]
               ],
           "yaxis"
             .= object
@@ -250,13 +332,21 @@ makePlotlyConfig metricName labels dataSets =
 plotColors :: [Text]
 plotColors = T.words "#4394E5 #87BB62 #876FD4 #F5921B #1f77b4 #ff7f0e #2ca02c #d62728"
 
-factorLegend_ :: [(Text, Text)] -> Html ()
-factorLegend_ entries =
+factorLegend_ :: Text -> [(Text, Text)] -> Html ()
+factorLegend_ chartId entries =
   div_ [class_ "factor-lines"] do
-    Foldable.for_ entries \(color, name) ->
+    Foldable.for_ (zip [0 :: Int ..] entries) \(idx, (color, name)) ->
       div_ [class_ "factor-line"] do
-        span_ [class_ "factor-swatch", style_ ("background-color: " <> color)] (pure ())
-        span_ (toHtml name)
+        button_
+          [ type_ "button",
+            class_ "factor-toggle",
+            title_ "Click to show or hide this line. Double-click to show only this line.",
+            makeAttributes "data-chart-id" chartId,
+            makeAttributes "data-trace-idx" (T.pack (show idx))
+          ]
+          do
+            span_ [class_ "factor-swatch", style_ ("background-color: " <> color)] (pure ())
+            span_ (toHtml name)
 
 factorSmall :: Prim.GeneralFactor -> Text
 factorSmall factor = T.concat [T.strip factor.name, "=", T.strip factor.value]
