@@ -1,7 +1,6 @@
 module Perf.Web.Plot where
 
 import Data.Aeson
-import Data.Coerce
 import Data.Foldable qualified as Foldable
 import Data.Map qualified as Map
 import Data.Set (Set)
@@ -11,6 +10,7 @@ import Data.Text qualified as T
 import Control.Monad
 import Lucid
 import Lucid.Base (makeAttributes)
+import NeatInterpolation (trimming)
 import Perf.DB.Materialize
 import Perf.Types.DB qualified as DB
 import Perf.Types.Prim qualified as Prim
@@ -23,12 +23,18 @@ data MasterPlotContext key
   -- ^ Master keys in historical order (oldest first), at most 'maxMasterCommits'.
 
 -- | Selectable values for the master-commits control.
-masterCommitOptions :: [Int]
-masterCommitOptions = [0, 1, 2, 3, 5, 10, 20, 30, 50, 100]
+masterCommitOptions :: Bool -> [Int]
+masterCommitOptions viewingMaster
+  | viewingMaster = [0, 1, 2, 3, 5, 10, 20, 30, 50, 100]
+  | otherwise = [0, 1, 2, 3, 5, 10, 20]
 
--- | How many master commits to load for the control (largest option).
+-- | How many master commits to load when viewing master.
 maxMasterCommits :: Int
-maxMasterCommits = maximum masterCommitOptions
+maxMasterCommits = maximum (masterCommitOptions True)
+
+-- | How many master commits to load when viewing a non-master branch.
+maxMasterCommitsOnBranch :: Int
+maxMasterCommitsOnBranch = maximum (masterCommitOptions False)
 
 generateCommitPlots :: BenchmarkSeries DB.Commit DB.Metric -> Html ()
 generateCommitPlots benchmarks =
@@ -46,7 +52,7 @@ generateCommitPlotsWith masterCtx branchCommits =
   generatePlotsWith
     masterCtx
     branchCommits
-    (T.take 8 . (coerce :: Prim.Hash -> Text) . (.commitHash))
+    shortCommitLabel
     (.metricMean)
 
 generateExternalPlots :: BenchmarkSeries Text DisplayMetric -> Html ()
@@ -76,21 +82,23 @@ generatePlotsWith masterCtx branchKeys renderKey metricMean benchmarks = do
         MasterComparisonDisabled -> False
         MasterComparisonEnabled {} -> True
       -- On master itself there is no trailing branch series.
+      viewingMaster = masterEnabled && null branchKeys
       defaultMasterShow
-        | masterEnabled && null branchKeys = 20
+        | viewingMaster = 20
         | masterEnabled = 1
         | otherwise = 0
-  unless (Map.null benchmarks) $ plotControls_ masterEnabled defaultMasterShow
+  unless (Map.null benchmarks) $
+    plotControls_ masterEnabled defaultMasterShow (masterCommitOptions viewingMaster)
   Foldable.for_ (zip [0 :: Int ..] (Map.toList benchmarks)) \(benchmarkIdx, (subject, tests)) -> do
     let metrics :: Set Prim.MetricLabel =
           Set.fromList $ concatMap Map.keys $ Map.elems tests
         searchText =
           T.toLower $
             T.unwords $
-              coerce subject : map coerce (Set.toList metrics)
+              subjectText subject : map metricText (Set.toList metrics)
     div_
       [ class_ "benchmark-subject",
-        makeAttributes "data-plot-title" (coerce subject),
+        makeAttributes "data-plot-title" (subjectText subject),
         makeAttributes "data-search-text" searchText
       ]
       do
@@ -131,8 +139,8 @@ collectKeys benchmarks =
         concatMap Map.elems $
           Map.elems benchmarks
 
-plotControls_ :: Bool -> Int -> Html ()
-plotControls_ masterEnabled defaultMasterShow = do
+plotControls_ :: Bool -> Int -> [Int] -> Html ()
+plotControls_ masterEnabled defaultMasterShow options = do
   div_
     [ class_ "plot-controls",
       style_ "display: flex; flex-wrap: wrap; gap: 1rem; align-items: center; margin: 1rem 0;"
@@ -157,7 +165,7 @@ plotControls_ masterEnabled defaultMasterShow = do
                 <> [makeAttributes "disabled" "disabled" | not masterEnabled]
             )
             do
-              forM_ masterCommitOptions \n ->
+              forM_ options \n ->
                 option_
                   ( [value_ (T.pack (show n))]
                       <> [makeAttributes "selected" "selected" | n == defaultMasterShow]
@@ -166,121 +174,121 @@ plotControls_ masterEnabled defaultMasterShow = do
 
 plotControlsScript :: Text
 plotControlsScript =
-  T.unlines
-    [ "(function () {",
-      "  const search = document.getElementById('plot-search');",
-      "  const masterSelect = document.getElementById('master-commits');",
-      "  const config = {responsive: true, modeBarButtonsToRemove: ['select2d', 'lasso2d']};",
-      "  const traceVisibility = new Map();",
-      "  const singleClickTimers = new Map();",
-      "  function applySearch() {",
-      "    if (!search) return;",
-      "    const q = (search.value || '').trim().toLowerCase();",
-      "    document.querySelectorAll('.benchmark-subject').forEach((el) => {",
-      "      const hay = el.getAttribute('data-search-text') || '';",
-      "      el.style.display = (!q || hay.includes(q)) ? '' : 'none';",
-      "    });",
-      "  }",
-      "  function masterShow() {",
-      "    if (!masterSelect || masterSelect.disabled) return 0;",
-      "    const n = parseInt(masterSelect.value, 10);",
-      "    return Number.isFinite(n) ? n : 0;",
-      "  }",
-      "  function slicePlotData(fullData, masterCount, showMaster) {",
-      "    const start = Math.max(0, masterCount - showMaster);",
-      "    return fullData.map((trace) => Object.assign({}, trace, {",
-      "      x: (trace.x || []).slice(start),",
-      "      y: (trace.y || []).slice(start)",
-      "    }));",
-      "  }",
-      "  function ensureVisibility(chartId, traceCount) {",
-      "    let vis = traceVisibility.get(chartId);",
-      "    if (!vis || vis.length !== traceCount) {",
-      "      vis = Array.from({length: traceCount}, () => true);",
-      "      traceVisibility.set(chartId, vis);",
-      "    }",
-      "    return vis;",
-      "  }",
-      "  function syncLegendUI(chartEl) {",
-      "    const vis = traceVisibility.get(chartEl.id) || [];",
-      "    const root = chartEl.parentElement;",
-      "    if (!root) return;",
-      "    root.querySelectorAll('.factor-toggle').forEach((btn, i) => {",
-      "      btn.classList.toggle('off', !vis[i]);",
-      "    });",
-      "  }",
-      "  function applyVisibility(chartEl) {",
-      "    const count = (chartEl.data && chartEl.data.length) || 0;",
-      "    if (!count) return Promise.resolve();",
-      "    const vis = ensureVisibility(chartEl.id, count);",
-      "    syncLegendUI(chartEl);",
-      "    return Plotly.restyle(chartEl, {visible: vis.slice()});",
-      "  }",
-      "  function colorMasterTicks(plotEl, showMaster) {",
-      "    const shown = Math.max(0, showMaster);",
-      "    plotEl.querySelectorAll('g.xtick text').forEach((node, i) => {",
-      "      const color = i < shown ? '#15803d' : '#111111';",
-      "      node.style.fill = color;",
-      "      node.setAttribute('fill', color);",
-      "    });",
-      "  }",
-      "  function redrawPlots() {",
-      "    const show = masterShow();",
-      "    document.querySelectorAll('.benchmark-plot').forEach((el) => {",
-      "      const fullData = JSON.parse(el.getAttribute('data-full') || '[]');",
-      "      const layout = JSON.parse(el.getAttribute('data-layout') || '{}');",
-      "      const masterCount = parseInt(el.getAttribute('data-master-count') || '0', 10) || 0;",
-      "      const data = slicePlotData(fullData, masterCount, show);",
-      "      ensureVisibility(el.id, data.length);",
-      "      const shownMaster = Math.min(show, masterCount);",
-      "      const finish = () => {",
-      "        colorMasterTicks(el, shownMaster);",
-      "        return applyVisibility(el).then(() => requestAnimationFrame(() => colorMasterTicks(el, shownMaster)));",
-      "      };",
-      "      const plotted = el.getAttribute('data-plotted') === '1'",
-      "        ? Plotly.react(el, data, layout, config)",
-      "        : Plotly.newPlot(el, data, layout, config).then(() => el.setAttribute('data-plotted', '1'));",
-      "      Promise.resolve(plotted).then(finish);",
-      "    });",
-      "  }",
-      "  function isolateTrace(chartEl, onlyIdx) {",
-      "    const count = (chartEl.data && chartEl.data.length) || 0;",
-      "    const vis = ensureVisibility(chartEl.id, count);",
-      "    for (let i = 0; i < vis.length; i++) vis[i] = i === onlyIdx;",
-      "    applyVisibility(chartEl);",
-      "  }",
-      "  document.addEventListener('click', (e) => {",
-      "    const btn = e.target.closest('.factor-toggle');",
-      "    if (!btn) return;",
-      "    const chartId = btn.getAttribute('data-chart-id');",
-      "    const traceIdx = parseInt(btn.getAttribute('data-trace-idx'), 10);",
-      "    const chartEl = chartId ? document.getElementById(chartId) : null;",
-      "    if (!chartEl || !Number.isFinite(traceIdx)) return;",
-      "    if (e.detail === 2) {",
-      "      const prev = singleClickTimers.get(btn);",
-      "      if (prev) clearTimeout(prev);",
-      "      singleClickTimers.delete(btn);",
-      "      isolateTrace(chartEl, traceIdx);",
-      "      return;",
-      "    }",
-      "    if (e.detail === 1) {",
-      "      const prev = singleClickTimers.get(btn);",
-      "      if (prev) clearTimeout(prev);",
-      "      singleClickTimers.set(btn, setTimeout(() => {",
-      "        singleClickTimers.delete(btn);",
-      "        const count = (chartEl.data && chartEl.data.length) || 0;",
-      "        const vis = ensureVisibility(chartEl.id, count);",
-      "        vis[traceIdx] = !vis[traceIdx];",
-      "        applyVisibility(chartEl);",
-      "      }, 280));",
-      "    }",
-      "  });",
-      "  if (search) search.addEventListener('input', applySearch);",
-      "  if (masterSelect) masterSelect.addEventListener('change', redrawPlots);",
-      "  applySearch();",
-      "  redrawPlots();",
-      "})();"
-    ]
+  [trimming|
+    (function () {
+      const search = document.getElementById('plot-search');
+      const masterSelect = document.getElementById('master-commits');
+      const config = ${plotlyConfigJson};
+      const traceVisibility = new Map();
+      const singleClickTimers = new Map();
+      function applySearch() {
+        if (!search) return;
+        const q = (search.value || '').trim().toLowerCase();
+        document.querySelectorAll('.benchmark-subject').forEach((el) => {
+          const hay = el.getAttribute('data-search-text') || '';
+          el.style.display = (!q || hay.includes(q)) ? '' : 'none';
+        });
+      }
+      function masterShow() {
+        if (!masterSelect || masterSelect.disabled) return 0;
+        const n = parseInt(masterSelect.value, 10);
+        return Number.isFinite(n) ? n : 0;
+      }
+      function slicePlotData(fullData, masterCount, showMaster) {
+        const start = Math.max(0, masterCount - showMaster);
+        return fullData.map((trace) => Object.assign({}, trace, {
+          x: (trace.x || []).slice(start),
+          y: (trace.y || []).slice(start)
+        }));
+      }
+      function ensureVisibility(chartId, traceCount) {
+        let vis = traceVisibility.get(chartId);
+        if (!vis || vis.length !== traceCount) {
+          vis = Array.from({length: traceCount}, () => true);
+          traceVisibility.set(chartId, vis);
+        }
+        return vis;
+      }
+      function syncLegendUI(chartEl) {
+        const vis = traceVisibility.get(chartEl.id) || [];
+        const root = chartEl.parentElement;
+        if (!root) return;
+        root.querySelectorAll('.factor-toggle').forEach((btn, i) => {
+          btn.classList.toggle('off', !vis[i]);
+        });
+      }
+      function applyVisibility(chartEl) {
+        const count = (chartEl.data && chartEl.data.length) || 0;
+        if (!count) return Promise.resolve();
+        const vis = ensureVisibility(chartEl.id, count);
+        syncLegendUI(chartEl);
+        return Plotly.restyle(chartEl, {visible: vis.slice()});
+      }
+      function colorMasterTicks(plotEl, showMaster) {
+        const shown = Math.max(0, showMaster);
+        plotEl.querySelectorAll('g.xtick text').forEach((node, i) => {
+          const color = i < shown ? '#15803d' : '#111111';
+          node.style.fill = color;
+          node.setAttribute('fill', color);
+        });
+      }
+      function redrawPlots() {
+        const show = masterShow();
+        document.querySelectorAll('.benchmark-plot').forEach((el) => {
+          const fullData = JSON.parse(el.getAttribute('data-full') || '[]');
+          const layout = JSON.parse(el.getAttribute('data-layout') || '{}');
+          const masterCount = parseInt(el.getAttribute('data-master-count') || '0', 10) || 0;
+          const data = slicePlotData(fullData, masterCount, show);
+          ensureVisibility(el.id, data.length);
+          const shownMaster = Math.min(show, masterCount);
+          const finish = () => {
+            colorMasterTicks(el, shownMaster);
+            return applyVisibility(el).then(() => requestAnimationFrame(() => colorMasterTicks(el, shownMaster)));
+          };
+          const plotted = el.getAttribute('data-plotted') === '1'
+            ? Plotly.react(el, data, layout, config)
+            : Plotly.newPlot(el, data, layout, config).then(() => el.setAttribute('data-plotted', '1'));
+          Promise.resolve(plotted).then(finish);
+        });
+      }
+      function isolateTrace(chartEl, onlyIdx) {
+        const count = (chartEl.data && chartEl.data.length) || 0;
+        const vis = ensureVisibility(chartEl.id, count);
+        for (let i = 0; i < vis.length; i++) vis[i] = i === onlyIdx;
+        applyVisibility(chartEl);
+      }
+      document.addEventListener('click', (e) => {
+        const btn = e.target.closest('.factor-toggle');
+        if (!btn) return;
+        const chartId = btn.getAttribute('data-chart-id');
+        const traceIdx = parseInt(btn.getAttribute('data-trace-idx'), 10);
+        const chartEl = chartId ? document.getElementById(chartId) : null;
+        if (!chartEl || !Number.isFinite(traceIdx)) return;
+        if (e.detail === 2) {
+          const prev = singleClickTimers.get(btn);
+          if (prev) clearTimeout(prev);
+          singleClickTimers.delete(btn);
+          isolateTrace(chartEl, traceIdx);
+          return;
+        }
+        if (e.detail === 1) {
+          const prev = singleClickTimers.get(btn);
+          if (prev) clearTimeout(prev);
+          singleClickTimers.set(btn, setTimeout(() => {
+            singleClickTimers.delete(btn);
+            const count = (chartEl.data && chartEl.data.length) || 0;
+            const vis = ensureVisibility(chartEl.id, count);
+            vis[traceIdx] = !vis[traceIdx];
+            applyVisibility(chartEl);
+          }, 280));
+        }
+      });
+      if (search) search.addEventListener('input', applySearch);
+      if (masterSelect) masterSelect.addEventListener('change', redrawPlots);
+      applySearch();
+      redrawPlots();
+    })();
+  |]
 
 makePlotlyConfig ::
   Prim.MetricLabel ->
@@ -304,9 +312,9 @@ makePlotlyConfig metricName labels dataSets =
       ]
     layout =
       object
-        [ "title"
+        [         "title"
             .= object
-              [ "text" .= coerce @_ @Text metricName,
+              [ "text" .= metricText metricName,
                 "font" .= object ["family" .= ("monospace" :: Text), "size" .= (16 :: Int)]
               ],
           "xaxis"
@@ -318,7 +326,7 @@ makePlotlyConfig metricName labels dataSets =
               ],
           "yaxis"
             .= object
-              [ "title" .= coerce @_ @Text metricName,
+              [ "title" .= metricText metricName,
                 "rangemode" .= ("tozero" :: Text),
                 "automargin" .= True,
                 "tickfont" .= object ["family" .= ("monospace" :: Text)]
@@ -353,3 +361,15 @@ factorSmall factor = T.concat [T.strip factor.name, "=", T.strip factor.value]
 
 factorsSmall :: Set Prim.GeneralFactor -> Text
 factorsSmall = T.intercalate "," . map factorSmall . Set.toList
+
+subjectText :: Prim.SubjectName -> Text
+subjectText (Prim.SubjectName t) = t
+
+metricText :: Prim.MetricLabel -> Text
+metricText (Prim.MetricLabel t) = t
+
+shortCommitLabel :: DB.Commit -> Text
+shortCommitLabel commit =
+  T.take 8 $
+    case commit.commitHash of
+      Prim.Hash h -> h

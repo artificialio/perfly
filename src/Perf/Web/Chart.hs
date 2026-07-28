@@ -16,8 +16,20 @@ data ChartOptions = ChartOptions
     heightPx :: Int
   }
 
--- | Emit a plot container. Plotting is performed by the shared controls script
--- in 'Perf.Web.Plot', which reads the data-* attributes.
+-- | Shared Plotly config (also embedded in the plot-controls script).
+plotlyConfig :: Value
+plotlyConfig =
+  object
+    [ "responsive" .= True,
+      "modeBarButtonsToRemove" .= (["select2d", "lasso2d"] :: [Text])
+    ]
+
+plotlyConfigJson :: Text
+plotlyConfigJson = encode' plotlyConfig
+
+-- | Emit a plot container. The shared controls script in 'Perf.Web.Plot' calls
+-- @Plotly.newPlot@ / @Plotly.react@ using the data-* attributes (so master-commit
+-- slicing and legend toggles can update plots in the browser).
 chart_ :: ChartOptions -> Html ()
 chart_ opts = do
   div_

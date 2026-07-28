@@ -59,6 +59,72 @@ mergeMasterIntoBranch masterBenchmarks branchBenchmarks =
     )
     branchBenchmarks
 
+-- | Loaded plot series for a branch page / CLI report.
+data BranchPlotData = BranchPlotData
+  { masterCommits :: [DB.Commit],
+    -- ^ Master commits in historical order (oldest first).
+    branchCommits :: [DB.Commit],
+    -- ^ Current-branch commits in historical order; empty when viewing master.
+    benchmarks :: BenchmarkSeries DB.Commit DB.Metric,
+    tableCommitEntities :: [Entity DB.Commit]
+    -- ^ Commits for the branch commits table (historical order).
+  }
+
+-- | Load master + branch series for plotting.
+--
+-- When @branchName == "master"@, @branchCommits@ is empty and @benchmarks@
+-- contains only master data. Otherwise master metrics are merged into branch
+-- subjects (master-only subjects are dropped).
+loadBranchPlotData ::
+  Text ->
+  Int ->
+  Int ->
+  DB.DB (Maybe BranchPlotData)
+loadBranchPlotData branchName branchLimit masterLimit = do
+  let isMaster = branchName == "master"
+  masterEntities <- loadBranchCommits "master" masterLimit
+  branchEntities <-
+    if isMaster
+      then pure []
+      else loadBranchCommits branchName branchLimit
+  let masterCommits = map entityVal masterEntities
+      branchCommits = map entityVal branchEntities
+      tableCommitEntities = if isMaster then masterEntities else branchEntities
+  case (isMaster, NonEmpty.nonEmpty masterEntities, NonEmpty.nonEmpty branchEntities) of
+    (True, Nothing, _) -> pure Nothing
+    (True, Just masterNE, _) -> do
+      benchmarks <- materializeCommits masterNE
+      pure $
+        Just
+          BranchPlotData
+            { masterCommits,
+              branchCommits = [],
+              benchmarks,
+              tableCommitEntities
+            }
+    (False, _, Nothing) -> pure Nothing
+    (False, Nothing, Just branchNE) -> do
+      benchmarks <- materializeCommits branchNE
+      pure $
+        Just
+          BranchPlotData
+            { masterCommits,
+              branchCommits,
+              benchmarks,
+              tableCommitEntities
+            }
+    (False, Just masterNE, Just branchNE) -> do
+      masterBenchmarks <- materializeCommits masterNE
+      branchBenchmarks <- materializeCommits branchNE
+      pure $
+        Just
+          BranchPlotData
+            { masterCommits,
+              branchCommits,
+              benchmarks = mergeMasterIntoBranch masterBenchmarks branchBenchmarks,
+              tableCommitEntities
+            }
+
 -- Materialize a set of commits into a data set we can work with.
 materializeCommits ::
   NonEmpty (Entity DB.Commit) ->
