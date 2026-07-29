@@ -63,6 +63,7 @@ library
     , lucid2
     , monad-logger
     , mtl
+    , neat-interpolation
     , persistent
     , persistent-sqlite
     , persistent-template

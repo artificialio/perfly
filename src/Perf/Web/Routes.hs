@@ -11,7 +11,6 @@ import Data.Maybe
 import Data.Set (Set)
 import Data.Text (Text)
 import Data.Text qualified as T
-import Data.Traversable
 import Database.Persist
 import Lucid.Base
 import Perf.DB.Import
@@ -19,7 +18,7 @@ import Perf.DB.Materialize
 import Perf.Types.DB qualified as DB
 import Perf.Types.External qualified as EX
 import Perf.Types.Prim qualified as Prim
-import Perf.Types.Web 
+import Perf.Types.Web
 import Perf.Web.Db
 import Perf.Web.Foundation
 import Perf.Web.Layout
@@ -54,24 +53,25 @@ getBranchR name = do
   mbranch <- db $ selectFirst [DB.BranchName ==. name] []
   case mbranch of
     Nothing -> notFound
-    Just (Entity branchId branch) -> do
+    Just (Entity _branchId branch) -> do
       mmaxGraph <- fmap (>>= (RIO.readMaybe @Int . T.unpack)) $ lookupGetParam "limit"
       let maxGraph :: Int = fromMaybe 28 $ mmaxGraph
-      mappings <-
-        db $
-          selectList
-            [DB.MapBranchCommitBranchId ==. branchId]
-            [Desc DB.MapBranchCommitId, LimitTo maxGraph]
-      commits <- fmap catMaybes $ RIO.for mappings \mapping ->
-        db $ selectFirst [DB.CommitId ==. mapping.entityVal.mapBranchCommitCommitId] []
-      mbenchmarks <- db $ for (NonEmpty.nonEmpty $ reverse commits) materializeCommits
+          isMaster = name == "master"
+      let masterLimit = if isMaster then maxMasterCommits else maxMasterCommitsOnBranch
+      mplotData <- db $ loadBranchPlotData name maxGraph masterLimit
       lucid do
         defaultLayout_ branch.branchName do
-          for_ mbenchmarks $ generalizeHtmlT . generatePlots
+          for_ mplotData \plotData ->
+            generalizeHtmlT $
+              generateCommitPlotsWith
+                (MasterComparisonEnabled plotData.masterCommits)
+                plotData.branchCommits
+                plotData.benchmarks
           h1_ "Commits"
           table_ do
-            let prevCommits = map Just (drop 1 commits) <> repeat Nothing
-            for_ (zip commits prevCommits) \(Entity _ commit, mprev) -> do
+            let commitsNewestFirst = maybe [] (reverse . (.tableCommitEntities)) mplotData
+                prevCommits = map Just (drop 1 commitsNewestFirst) <> repeat Nothing
+            for_ (zip commitsNewestFirst prevCommits) \(Entity _ commit, mprev) -> do
               let mprevious = fmap (.entityVal) mprev
               url <- asks (.url)
               tr_ do
@@ -94,13 +94,8 @@ getBranchR name = do
                       $ "compare previous"
           p_ $ small_ do
             "(limited to most recent "
-            toHtml $ show maxGraph
+            toHtml $ show $ if isMaster then maxMasterCommits else maxGraph
             " commits)"
-
-generatePlots ::
-  BenchmarkSeries DB.Commit DB.Metric ->
-  Html ()
-generatePlots = generateCommitPlots
 
 getCommitR :: Prim.Hash -> Handler (Html ())
 getCommitR hash = do

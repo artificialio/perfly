@@ -46,6 +46,7 @@ dependencies:
 - persistent-template
 - hspec-discover
 - containers
+- neat-interpolation
 
 ghc-options:
 - -Wall

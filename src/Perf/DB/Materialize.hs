@@ -1,5 +1,6 @@
 module Perf.DB.Materialize where
 
+import Data.Maybe (catMaybes)
 import qualified Data.List as List
 import Data.List.NonEmpty (NonEmpty)
 import qualified Data.List.NonEmpty as NonEmpty
@@ -24,6 +25,105 @@ data DisplayMetric = DisplayMetric
   { mean :: Double
   }
   deriving (Eq, Show)
+
+-- | Most recent commits on a branch, returned in historical order (oldest first).
+loadBranchCommits :: Text -> Int -> DB.DB [Entity DB.Commit]
+loadBranchCommits branchName limit = do
+  mbranch <- selectFirst [DB.BranchName ==. branchName] []
+  case mbranch of
+    Nothing -> pure []
+    Just (Entity branchId _) -> do
+      mappings <-
+        selectList
+          [DB.MapBranchCommitBranchId ==. branchId]
+          [Desc DB.MapBranchCommitId, LimitTo limit]
+      commits <-
+        mapM
+          (\mapping -> selectFirst [DB.CommitId ==. mapping.entityVal.mapBranchCommitCommitId] [])
+          mappings
+      pure $ reverse $ catMaybes commits
+
+-- | Merge master metrics into branch subjects only (drop master-only subjects).
+mergeMasterIntoBranch ::
+  Ord key =>
+  BenchmarkSeries key metric ->
+  BenchmarkSeries key metric ->
+  BenchmarkSeries key metric
+mergeMasterIntoBranch masterBenchmarks branchBenchmarks =
+  Map.mapWithKey
+    ( \subject branchTests ->
+        case Map.lookup subject masterBenchmarks of
+          Nothing -> branchTests
+          Just masterTests ->
+            Map.unionWith (Map.unionWith Map.union) masterTests branchTests
+    )
+    branchBenchmarks
+
+-- | Loaded plot series for a branch page / CLI report.
+data BranchPlotData = BranchPlotData
+  { masterCommits :: [DB.Commit],
+    -- ^ Master commits in historical order (oldest first).
+    branchCommits :: [DB.Commit],
+    -- ^ Current-branch commits in historical order; empty when viewing master.
+    benchmarks :: BenchmarkSeries DB.Commit DB.Metric,
+    tableCommitEntities :: [Entity DB.Commit]
+    -- ^ Commits for the branch commits table (historical order).
+  }
+
+-- | Load master + branch series for plotting.
+--
+-- When @branchName == "master"@, @branchCommits@ is empty and @benchmarks@
+-- contains only master data. Otherwise master metrics are merged into branch
+-- subjects (master-only subjects are dropped).
+loadBranchPlotData ::
+  Text ->
+  Int ->
+  Int ->
+  DB.DB (Maybe BranchPlotData)
+loadBranchPlotData branchName branchLimit masterLimit = do
+  let isMaster = branchName == "master"
+  masterEntities <- loadBranchCommits "master" masterLimit
+  branchEntities <-
+    if isMaster
+      then pure []
+      else loadBranchCommits branchName branchLimit
+  let masterCommits = map entityVal masterEntities
+      branchCommits = map entityVal branchEntities
+      tableCommitEntities = if isMaster then masterEntities else branchEntities
+  case (isMaster, NonEmpty.nonEmpty masterEntities, NonEmpty.nonEmpty branchEntities) of
+    (True, Nothing, _) -> pure Nothing
+    (True, Just masterNE, _) -> do
+      benchmarks <- materializeCommits masterNE
+      pure $
+        Just
+          BranchPlotData
+            { masterCommits,
+              branchCommits = [],
+              benchmarks,
+              tableCommitEntities
+            }
+    (False, _, Nothing) -> pure Nothing
+    (False, Nothing, Just branchNE) -> do
+      benchmarks <- materializeCommits branchNE
+      pure $
+        Just
+          BranchPlotData
+            { masterCommits,
+              branchCommits,
+              benchmarks,
+              tableCommitEntities
+            }
+    (False, Just masterNE, Just branchNE) -> do
+      masterBenchmarks <- materializeCommits masterNE
+      branchBenchmarks <- materializeCommits branchNE
+      pure $
+        Just
+          BranchPlotData
+            { masterCommits,
+              branchCommits,
+              benchmarks = mergeMasterIntoBranch masterBenchmarks branchBenchmarks,
+              tableCommitEntities
+            }
 
 -- Materialize a set of commits into a data set we can work with.
 materializeCommits ::
