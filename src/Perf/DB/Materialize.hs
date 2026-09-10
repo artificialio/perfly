@@ -22,7 +22,8 @@ type BenchmarkSeries key metric =
         (Map key metric)))
 
 data DisplayMetric = DisplayMetric
-  { mean :: Double
+  { mean :: Double,
+    stddev :: Double
   }
   deriving (Eq, Show)
 
@@ -191,5 +192,12 @@ materializeExternalSnapshots snapshots =
                     metrics =
                       Map.fromList $
                         flip map test.metrics \metric ->
-                          (Prim.MetricLabel metric.metric, Map.singleton label DisplayMetric {mean = metric.mean})
+                          ( Prim.MetricLabel metric.metric,
+                            Map.singleton
+                              label
+                              DisplayMetric
+                                { mean = metric.mean,
+                                  stddev = metric.stddev
+                                }
+                          )
                  in (factors, metrics))
