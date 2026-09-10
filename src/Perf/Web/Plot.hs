@@ -2,7 +2,9 @@ module Perf.Web.Plot where
 
 import Data.Aeson
 import Data.Foldable qualified as Foldable
+import Data.List (sortBy)
 import Data.Map qualified as Map
+import Data.Ord (comparing)
 import Data.Set (Set)
 import Data.Set qualified as Set
 import Data.Text (Text)
@@ -93,8 +95,11 @@ generatePlotsWith masterCtx branchKeys renderKey metricMean metricStddev benchma
   unless (Map.null benchmarks) $
     plotControls_ masterEnabled defaultMasterShow (masterCommitOptions viewingMaster)
   Foldable.for_ (zip [0 :: Int ..] (Map.toList benchmarks)) \(benchmarkIdx, (subject, tests)) -> do
-    let metrics :: Set Prim.MetricLabel =
-          Set.fromList $ concatMap Map.keys $ Map.elems tests
+    let metrics =
+          orderMetrics $
+            Set.fromList $
+              concatMap Map.keys $
+                Map.elems tests
     div_
       [ class_ "benchmark-subject",
         makeAttributes "data-plot-title" (subjectText subject),
@@ -104,7 +109,7 @@ generatePlotsWith masterCtx branchKeys renderKey metricMean metricStddev benchma
       do
         h2_ $ toHtml subject
         div_ [class_ "chart-grid"] do
-          Foldable.for_ (zip [0 :: Int ..] (Set.toList metrics)) \(metricIdx, metricLabel) -> do
+          Foldable.for_ (zip [0 :: Int ..] metrics) \(metricIdx, metricLabel) -> do
             let dataSets =
                   flip map (Map.toList tests) \(factors, allMetrics) ->
                     let metricSeries = Map.findWithDefault Map.empty metricLabel allMetrics
@@ -403,6 +408,14 @@ subjectText (Prim.SubjectName t) = t
 
 metricText :: Prim.MetricLabel -> Text
 metricText (Prim.MetricLabel t) = t
+
+-- | Metrics whose names start with "time" come first; the rest stay alphabetical.
+orderMetrics :: Set Prim.MetricLabel -> [Prim.MetricLabel]
+orderMetrics =
+  sortBy (comparing isNotTime <> comparing metricText) . Set.toList
+  where
+    isNotTime label =
+      not $ T.isPrefixOf "time" $ T.toLower $ metricText label
 
 shortCommitLabel :: DB.Commit -> Text
 shortCommitLabel commit =
