@@ -2,7 +2,9 @@ module Perf.Web.Plot where
 
 import Data.Aeson
 import Data.Foldable qualified as Foldable
+import Data.List (sortBy)
 import Data.Map qualified as Map
+import Data.Ord (comparing)
 import Data.Set (Set)
 import Data.Set qualified as Set
 import Data.Text (Text)
@@ -25,8 +27,8 @@ data MasterPlotContext key
 -- | Selectable values for the master-commits control.
 masterCommitOptions :: Bool -> [Int]
 masterCommitOptions viewingMaster
-  | viewingMaster = [0, 1, 2, 3, 5, 10, 20, 30, 50, 100]
-  | otherwise = [0, 1, 2, 3, 5, 10, 20]
+  | viewingMaster = [0, 1, 2, 3, 5, 10, 20, 30, 50, 100, 150, 200, 250, 300, 400, 500]
+  | otherwise = [0, 1, 2, 3, 5, 10, 20, 30, 50]
 
 -- | How many master commits to load when viewing master.
 maxMasterCommits :: Int
@@ -54,6 +56,7 @@ generateCommitPlotsWith masterCtx branchCommits =
     branchCommits
     shortCommitLabel
     (.metricMean)
+    (.metricStddev)
 
 generateExternalPlots :: BenchmarkSeries Text DisplayMetric -> Html ()
 generateExternalPlots benchmarks =
@@ -62,6 +65,7 @@ generateExternalPlots benchmarks =
     (collectKeys benchmarks)
     id
     (.mean)
+    (.stddev)
     benchmarks
 
 generatePlotsWith ::
@@ -70,9 +74,10 @@ generatePlotsWith ::
   [key] ->
   (key -> Text) ->
   (metric -> Double) ->
+  (metric -> Double) ->
   BenchmarkSeries key metric ->
   Html ()
-generatePlotsWith masterCtx branchKeys renderKey metricMean benchmarks = do
+generatePlotsWith masterCtx branchKeys renderKey metricMean metricStddev benchmarks = do
   let masterKeys = case masterCtx of
         MasterComparisonDisabled -> []
         MasterComparisonEnabled cs -> cs
@@ -85,13 +90,16 @@ generatePlotsWith masterCtx branchKeys renderKey metricMean benchmarks = do
       viewingMaster = masterEnabled && null branchKeys
       defaultMasterShow
         | viewingMaster = 20
-        | masterEnabled = 1
+        | masterEnabled = 3
         | otherwise = 0
   unless (Map.null benchmarks) $
     plotControls_ masterEnabled defaultMasterShow (masterCommitOptions viewingMaster)
   Foldable.for_ (zip [0 :: Int ..] (Map.toList benchmarks)) \(benchmarkIdx, (subject, tests)) -> do
-    let metrics :: Set Prim.MetricLabel =
-          Set.fromList $ concatMap Map.keys $ Map.elems tests
+    let metrics =
+          orderMetrics $
+            Set.fromList $
+              concatMap Map.keys $
+                Map.elems tests
     div_
       [ class_ "benchmark-subject",
         makeAttributes "data-plot-title" (subjectText subject),
@@ -101,15 +109,21 @@ generatePlotsWith masterCtx branchKeys renderKey metricMean benchmarks = do
       do
         h2_ $ toHtml subject
         div_ [class_ "chart-grid"] do
-          Foldable.for_ (zip [0 :: Int ..] (Set.toList metrics)) \(metricIdx, metricLabel) -> do
+          Foldable.for_ (zip [0 :: Int ..] metrics) \(metricIdx, metricLabel) -> do
             let dataSets =
                   flip map (Map.toList tests) \(factors, allMetrics) ->
-                    (factors, toSeries orderedKeys (Map.findWithDefault Map.empty metricLabel allMetrics))
+                    let metricSeries = Map.findWithDefault Map.empty metricLabel allMetrics
+                     in ( factors,
+                          toSeries metricMean orderedKeys metricSeries,
+                          toSeries ((2 *) . metricStddev) orderedKeys metricSeries
+                        )
                 labels = map renderKey orderedKeys
                 (plotData, layout) = makePlotlyConfig metricLabel labels dataSets
                 chartId = T.pack (show benchmarkIdx) <> "-" <> T.pack (show metricIdx)
                 legendEntries =
-                  zip (cycle plotColors) (map (factorsSmall . fst) dataSets)
+                  zip
+                    (cycle plotColors)
+                    (map (\(factors, _, _) -> factorsSmall factors) dataSets)
             div_ [class_ "chart-cell"] do
               chart_
                 ChartOptions
@@ -125,9 +139,9 @@ generatePlotsWith masterCtx branchKeys renderKey metricMean benchmarks = do
     -- Script must run after plot containers are in the DOM.
     script_ plotControlsScript
   where
-    toSeries keys metricMap =
+    toSeries accessor keys metricMap =
       flip map keys \key ->
-        maybe Null (toJSON . metricMean) $
+        maybe Null (toJSON . accessor) $
           Map.lookup key metricMap
 
 collectKeys :: Ord key => BenchmarkSeries key metric -> [key]
@@ -170,6 +184,17 @@ plotControls_ masterEnabled defaultMasterShow options = do
                       <> [makeAttributes "selected" "selected" | n == defaultMasterShow]
                   )
                   (toHtml (show n))
+      label_
+        [ for_ "start-y-at-zero",
+          style_ "display: flex; align-items: center; gap: 0.4rem; white-space: nowrap;"
+        ]
+        do
+          input_
+            [ type_ "checkbox",
+              id_ "start-y-at-zero",
+              makeAttributes "checked" "checked"
+            ]
+          "Start Y axis at zero"
 
 -- | Color the first N x-axis ticks green via CSS (survives Plotly resize redraws).
 masterTickStyles :: Text
@@ -191,6 +216,7 @@ plotControlsScript =
     (function () {
       const search = document.getElementById('plot-search');
       const masterSelect = document.getElementById('master-commits');
+      const startYAtZero = document.getElementById('start-y-at-zero');
       const config = ${plotlyConfigJson};
       const traceVisibility = new Map();
       const singleClickTimers = new Map();
@@ -242,6 +268,8 @@ plotControlsScript =
         document.querySelectorAll('.benchmark-plot').forEach((el) => {
           const fullData = JSON.parse(el.getAttribute('data-full') || '[]');
           const layout = JSON.parse(el.getAttribute('data-layout') || '{}');
+          layout.yaxis = layout.yaxis || {};
+          layout.yaxis.rangemode = (!startYAtZero || startYAtZero.checked) ? 'tozero' : 'normal';
           const masterCount = parseInt(el.getAttribute('data-master-count') || '0', 10) || 0;
           const data = slicePlotData(fullData, masterCount, show);
           ensureVisibility(el.id, data.length);
@@ -288,6 +316,7 @@ plotControlsScript =
       });
       if (search) search.addEventListener('input', applySearch);
       if (masterSelect) masterSelect.addEventListener('change', redrawPlots);
+      if (startYAtZero) startYAtZero.addEventListener('change', redrawPlots);
       applySearch();
       redrawPlots();
     })();
@@ -296,7 +325,7 @@ plotControlsScript =
 makePlotlyConfig ::
   Prim.MetricLabel ->
   [Text] ->
-  [(Set Prim.GeneralFactor, [Value])] ->
+  [(Set Prim.GeneralFactor, [Value], [Value])] ->
   (Value, Value)
 makePlotlyConfig metricName labels dataSets =
   (toJSON traces, layout)
@@ -309,9 +338,15 @@ makePlotlyConfig metricName labels dataSets =
             "mode" .= ("lines+markers" :: Text),
             "name" .= factorsSmall factors,
             "line" .= object ["color" .= color, "width" .= (2 :: Int)],
-            "marker" .= object ["size" .= (7 :: Int), "color" .= color]
+            "marker" .= object ["size" .= (7 :: Int), "color" .= color],
+            "error_y"
+              .= object
+                [ "type" .= ("data" :: Text),
+                  "array" .= errors,
+                  "visible" .= True
+                ]
           ]
-        | ((factors, series), color) <- zip dataSets $ cycle plotColors
+        | ((factors, series, errors), color) <- zip dataSets $ cycle plotColors
       ]
     layout =
       object
@@ -323,6 +358,9 @@ makePlotlyConfig metricName labels dataSets =
           "xaxis"
             .= object
               [ "title" .= ("" :: Text),
+                "type" .= ("category" :: Text),
+                "categoryorder" .= ("array" :: Text),
+                "categoryarray" .= labels,
                 "tickangle" .= (-30 :: Int),
                 "automargin" .= True,
                 "tickfont" .= object ["family" .= ("monospace" :: Text), "color" .= ("#111111" :: Text)]
@@ -370,6 +408,14 @@ subjectText (Prim.SubjectName t) = t
 
 metricText :: Prim.MetricLabel -> Text
 metricText (Prim.MetricLabel t) = t
+
+-- | Metrics whose names start with "time" come first; the rest stay alphabetical.
+orderMetrics :: Set Prim.MetricLabel -> [Prim.MetricLabel]
+orderMetrics =
+  sortBy (comparing isNotTime <> comparing metricText) . Set.toList
+  where
+    isNotTime label =
+      not $ T.isPrefixOf "time" $ T.toLower $ metricText label
 
 shortCommitLabel :: DB.Commit -> Text
 shortCommitLabel commit =
