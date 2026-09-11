@@ -27,8 +27,8 @@ data MasterPlotContext key
 -- | Selectable values for the master-commits control.
 masterCommitOptions :: Bool -> [Int]
 masterCommitOptions viewingMaster
-  | viewingMaster = [0, 1, 2, 3, 5, 10, 20, 30, 50, 100]
-  | otherwise = [0, 1, 2, 3, 5, 10, 20]
+  | viewingMaster = [0, 1, 2, 3, 5, 10, 20, 30, 50, 100, 150, 200, 250, 300, 400, 500]
+  | otherwise = [0, 1, 2, 3, 5, 10, 20, 30, 50]
 
 -- | How many master commits to load when viewing master.
 maxMasterCommits :: Int
@@ -90,7 +90,7 @@ generatePlotsWith masterCtx branchKeys renderKey metricMean metricStddev benchma
       viewingMaster = masterEnabled && null branchKeys
       defaultMasterShow
         | viewingMaster = 20
-        | masterEnabled = 1
+        | masterEnabled = 3
         | otherwise = 0
   unless (Map.null benchmarks) $
     plotControls_ masterEnabled defaultMasterShow (masterCommitOptions viewingMaster)
