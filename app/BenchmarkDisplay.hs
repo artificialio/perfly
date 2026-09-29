@@ -56,6 +56,7 @@ main = do
             Just plotData ->
               generateCommitPlotsWith
                 (MasterComparisonEnabled plotData.masterCommits)
+                Nothing
                 plotData.branchCommits
                 plotData.benchmarks
       writeAndOpen cli.outputPath $

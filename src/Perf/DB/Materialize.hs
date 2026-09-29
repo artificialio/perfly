@@ -1,6 +1,6 @@
 module Perf.DB.Materialize where
 
-import Data.Maybe (catMaybes)
+import Data.Maybe (mapMaybe)
 import qualified Data.List as List
 import Data.List.NonEmpty (NonEmpty)
 import qualified Data.List.NonEmpty as NonEmpty
@@ -9,8 +9,10 @@ import qualified Data.Map as Map
 import Data.Set (Set)
 import qualified Data.Set as Set
 import Data.Text (Text)
+import qualified Data.Text as T
 import Data.Traversable
 import Database.Persist
+import Database.Persist.Sql (Single (..), rawSql)
 import qualified Perf.Types.Prim as Prim
 import qualified Perf.Types.DB as DB
 import qualified Perf.Types.External as EX
@@ -38,11 +40,10 @@ loadBranchCommits branchName limit = do
         selectList
           [DB.MapBranchCommitBranchId ==. branchId]
           [Desc DB.MapBranchCommitId, LimitTo limit]
-      commits <-
-        mapM
-          (\mapping -> selectFirst [DB.CommitId ==. mapping.entityVal.mapBranchCommitCommitId] [])
-          mappings
-      pure $ reverse $ catMaybes commits
+      let commitIds = map (.entityVal.mapBranchCommitCommitId) mappings
+      commits <- selectList [DB.CommitId <-. commitIds] []
+      let commitsById = Map.fromList [(entityKey commit, commit) | commit <- commits]
+      pure $ reverse $ mapMaybe (`Map.lookup` commitsById) commitIds
 
 -- | Merge master metrics into branch subjects only (drop master-only subjects).
 mergeMasterIntoBranch ::
@@ -132,12 +133,35 @@ materializeCommits ::
   DB.DB
     (BenchmarkSeries DB.Commit DB.Metric)
 materializeCommits commits = do
-  benchmarks <- traverse materializeCommit commits
+  let commitsById = Map.fromList [(entityKey commit, entityVal commit) | commit <- NonEmpty.toList commits]
+      commitIds = Map.keys commitsById
+      params = map toPersistValue commitIds
+      joinFor table =
+        " JOIN test ON "
+          <> table
+          <> ".test_id = test.id JOIN benchmark ON test.benchmark_id = benchmark.id WHERE benchmark.commit_id IN ("
+          <> T.intercalate "," (map (const "?") commitIds)
+          <> ")"
+  factorRows :: [(Single DB.TestId, Single Text, Single Text)] <-
+    rawSql ("SELECT factor.test_id, factor.name, factor.value FROM factor" <> joinFor "factor") params
+  metricRows :: [(Entity DB.Metric, Single DB.CommitId, Single Prim.SubjectName)] <-
+    rawSql ("SELECT ??, benchmark.commit_id, benchmark.subject FROM metric" <> joinFor "metric") params
+  let factorsByTest =
+        Map.fromListWith
+          Set.union
+          [ (testId, Set.singleton (Prim.GeneralFactor name value))
+          | (Single testId, Single name, Single value) <- factorRows
+          ]
   pure $
-    List.foldl1' (Map.unionWith (Map.unionWith (Map.unionWith Map.union))) $
-    NonEmpty.toList $
-    fmap (fmap (fmap (fmap (\(commit, metric) -> Map.singleton commit metric)))) $
-    benchmarks
+    Map.fromListWith (Map.unionWith (Map.unionWith Map.union))
+      [ ( subject,
+          Map.singleton
+            (Map.findWithDefault Set.empty metric.metricTestId factorsByTest)
+            (Map.singleton metric.metricName (Map.singleton commit metric))
+        )
+      | (Entity _ metric, Single commitId, Single subject) <- metricRows,
+        Just commit <- [Map.lookup commitId commitsById]
+      ]
 
 -- Materialize a commit at a given timestamp into data we can work with.
 materializeCommit ::
