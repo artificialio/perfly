@@ -10,9 +10,11 @@ import Lucid.Base (makeAttributes)
 
 data ChartOptions = ChartOptions
   { chartId :: Text,
-    plotData :: Value,
+    -- | One entry per line: its series key, legend name and colour.
+    traces :: Value,
+    -- | Plotly layout without the x-axis categories, which depend on how many
+    -- master commits are shown.
     layout :: Value,
-    masterCount :: Int,
     heightPx :: Int
   }
 
@@ -27,18 +29,17 @@ plotlyConfig =
 plotlyConfigJson :: Text
 plotlyConfigJson = encode' plotlyConfig
 
--- | Emit a plot container. The shared controls script in 'Perf.Web.Plot' calls
--- @Plotly.newPlot@ / @Plotly.react@ using the data-* attributes (so master-commit
--- slicing and legend toggles can update plots in the browser).
+-- | Emit an empty plot container. The shared controls script in 'Perf.Web.Plot'
+-- fills it with @Plotly.newPlot@ / @Plotly.react@ once it scrolls into view,
+-- reading the points from the page-level plot data.
 chart_ :: ChartOptions -> Html ()
 chart_ opts = do
   div_
     [ id_ opts.chartId,
       class_ "benchmark-plot",
       style_ $ "height: " <> T.pack (show opts.heightPx) <> "px;",
-      makeAttributes "data-full" (encode' opts.plotData),
-      makeAttributes "data-layout" (encode' opts.layout),
-      makeAttributes "data-master-count" (T.pack (show opts.masterCount))
+      makeAttributes "data-traces" (encode' opts.traces),
+      makeAttributes "data-layout" (encode' opts.layout)
     ]
     (pure ())
 

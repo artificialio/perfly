@@ -1,6 +1,5 @@
 module Perf.DB.Materialize where
 
-import Data.Maybe (catMaybes)
 import qualified Data.List as List
 import Data.List.NonEmpty (NonEmpty)
 import qualified Data.List.NonEmpty as NonEmpty
@@ -10,7 +9,8 @@ import Data.Set (Set)
 import qualified Data.Set as Set
 import Data.Text (Text)
 import Data.Traversable
-import Database.Persist
+import Database.Esqueleto.Experimental
+import qualified Database.Persist as Persist
 import qualified Perf.Types.Prim as Prim
 import qualified Perf.Types.DB as DB
 import qualified Perf.Types.External as EX
@@ -29,20 +29,24 @@ data DisplayMetric = DisplayMetric
 
 -- | Most recent commits on a branch, returned in historical order (oldest first).
 loadBranchCommits :: Text -> Int -> DB.DB [Entity DB.Commit]
-loadBranchCommits branchName limit = do
-  mbranch <- selectFirst [DB.BranchName ==. branchName] []
-  case mbranch of
-    Nothing -> pure []
-    Just (Entity branchId _) -> do
-      mappings <-
-        selectList
-          [DB.MapBranchCommitBranchId ==. branchId]
-          [Desc DB.MapBranchCommitId, LimitTo limit]
-      commits <-
-        mapM
-          (\mapping -> selectFirst [DB.CommitId ==. mapping.entityVal.mapBranchCommitCommitId] [])
-          mappings
-      pure $ reverse $ catMaybes commits
+loadBranchCommits branchName maxCommits = do
+  commits <- select $ do
+    (branch :& mapping :& commit) <-
+      from $
+        table @DB.Branch
+          `innerJoin` table @DB.MapBranchCommit
+            `on` ( \(branch :& mapping) ->
+                     branch ^. DB.BranchId ==. mapping ^. DB.MapBranchCommitBranchId
+                 )
+          `innerJoin` table @DB.Commit
+            `on` ( \(_branch :& mapping :& commit) ->
+                     mapping ^. DB.MapBranchCommitCommitId ==. commit ^. DB.CommitId
+                 )
+    where_ $ branch ^. DB.BranchName ==. val branchName
+    orderBy [desc (mapping ^. DB.MapBranchCommitId)]
+    limit (fromIntegral maxCommits)
+    pure commit
+  pure (reverse commits)
 
 -- | Merge master metrics into branch subjects only (drop master-only subjects).
 mergeMasterIntoBranch ::
@@ -132,12 +136,52 @@ materializeCommits ::
   DB.DB
     (BenchmarkSeries DB.Commit DB.Metric)
 materializeCommits commits = do
-  benchmarks <- traverse materializeCommit commits
+  let commitsById = Map.fromList [(entityKey commit, entityVal commit) | commit <- NonEmpty.toList commits]
+      commitIds = Map.keys commitsById
+  factorRows <- select $ do
+    (factor :& _test :& benchmark) <-
+      from $
+        table @DB.Factor
+          `innerJoin` table @DB.Test
+            `on` ( \(factor :& test) ->
+                     factor ^. DB.FactorTestId ==. test ^. DB.TestId
+                 )
+          `innerJoin` table @DB.Benchmark
+            `on` ( \(_factor :& test :& benchmark) ->
+                     test ^. DB.TestBenchmarkId ==. benchmark ^. DB.BenchmarkId
+                 )
+    where_ $ benchmark ^. DB.BenchmarkCommitId `in_` valList commitIds
+    pure (factor ^. DB.FactorTestId, factor ^. DB.FactorName, factor ^. DB.FactorValue)
+  metricRows <- select $ do
+    (metric :& _test :& benchmark) <-
+      from $
+        table @DB.Metric
+          `innerJoin` table @DB.Test
+            `on` ( \(metric :& test) ->
+                     metric ^. DB.MetricTestId ==. test ^. DB.TestId
+                 )
+          `innerJoin` table @DB.Benchmark
+            `on` ( \(_metric :& test :& benchmark) ->
+                     test ^. DB.TestBenchmarkId ==. benchmark ^. DB.BenchmarkId
+                 )
+    where_ $ benchmark ^. DB.BenchmarkCommitId `in_` valList commitIds
+    pure (metric, benchmark ^. DB.BenchmarkCommitId, benchmark ^. DB.BenchmarkSubject)
+  let factorsByTest =
+        Map.fromListWith
+          Set.union
+          [ (testId, Set.singleton (Prim.GeneralFactor name value))
+          | (Value testId, Value name, Value value) <- factorRows
+          ]
   pure $
-    List.foldl1' (Map.unionWith (Map.unionWith (Map.unionWith Map.union))) $
-    NonEmpty.toList $
-    fmap (fmap (fmap (fmap (\(commit, metric) -> Map.singleton commit metric)))) $
-    benchmarks
+    Map.fromListWith (Map.unionWith (Map.unionWith Map.union))
+      [ ( subject,
+          Map.singleton
+            (Map.findWithDefault Set.empty metric.metricTestId factorsByTest)
+            (Map.singleton metric.metricName (Map.singleton commit metric))
+        )
+      | (Entity _ metric, Value commitId, Value subject) <- metricRows,
+        Just commit <- [Map.lookup commitId commitsById]
+      ]
 
 -- Materialize a commit at a given timestamp into data we can work with.
 materializeCommit ::
@@ -148,12 +192,12 @@ materializeCommit ::
         (Map Prim.MetricLabel
            (DB.Commit, DB.Metric))))
 materializeCommit commit = do
-  benchmarks0 <- selectList [DB.BenchmarkCommitId ==. commit.entityKey] [Desc DB.BenchmarkCommitId]
+  benchmarks0 <- Persist.selectList [DB.BenchmarkCommitId Persist.==. commit.entityKey] [Persist.Desc DB.BenchmarkCommitId]
   benchmarks <- for benchmarks0 \(Entity benchmarkId benchmark) -> do
-    tests0 <- selectList [DB.TestBenchmarkId ==. benchmarkId] []
+    tests0 <- Persist.selectList [DB.TestBenchmarkId Persist.==. benchmarkId] []
     tests <- for tests0 \(Entity testId _) -> do
-      factors <- selectList [DB.FactorTestId ==. testId] []
-      metrics <- selectList [DB.MetricTestId ==. testId] []
+      factors <- Persist.selectList [DB.FactorTestId Persist.==. testId] []
+      metrics <- Persist.selectList [DB.MetricTestId Persist.==. testId] []
       pure (map (\factor -> Prim.GeneralFactor factor.entityVal.factorName
                                                factor.entityVal.factorValue)
                 factors,

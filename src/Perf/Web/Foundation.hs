@@ -16,6 +16,7 @@ mkYesodData "App" [parseRoutes|
   /branch/#Text/#Hash BranchCommitR GET
   /commit/#Hash CommitR GET
   /compare/#Hash/#Hash CompareCommitsR GET
+  /master-series MasterSeriesR GET
   /hooks/update ReceiverR POST
 |]
 
@@ -33,4 +34,5 @@ instance YesodBreadcrumbs App where
         let short x = T.take 8 $ coerce x
         in return ("Compare " <> short hash0 <> " .. " <> short hash1, Just HomeR)
       BranchCommitR branch commit -> return (coerce commit, Just $ BranchR branch)
+      MasterSeriesR -> return ("Master series", Nothing)
       ReceiverR -> return ("Webhook Receiver", Nothing)

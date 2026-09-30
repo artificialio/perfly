@@ -55,6 +55,7 @@ library
     , containers
     , criterion-measurement
     , directory
+    , esqueleto
     , exceptions
     , formatting
     , hspec-discover
@@ -107,6 +108,7 @@ executable benchmark-display
     , containers
     , criterion-measurement
     , directory
+    , esqueleto
     , exceptions
     , filepath
     , formatting
@@ -162,6 +164,7 @@ executable perfly
     , containers
     , criterion-measurement
     , directory
+    , esqueleto
     , exceptions
     , formatting
     , hspec-discover
@@ -219,6 +222,7 @@ test-suite spec
     , containers
     , criterion-measurement
     , directory
+    , esqueleto
     , exceptions
     , formatting
     , hspec

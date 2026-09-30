@@ -57,23 +57,29 @@ getBranchR name = do
       mmaxGraph <- fmap (>>= (RIO.readMaybe @Int . T.unpack)) $ lookupGetParam "limit"
       let maxGraph :: Int = fromMaybe 28 $ mmaxGraph
           isMaster = name == "master"
-      let masterLimit = if isMaster then maxMasterCommits else maxMasterCommitsOnBranch
-      mplotData <- db $ loadBranchPlotData name maxGraph masterLimit
+      -- The plots start with the default master window; the page fetches more
+      -- from MasterSeriesR when asked.
+      mplotData <- db $ loadBranchPlotData name maxGraph (defaultMasterShown isMaster)
+      tableCommits <-
+        if isMaster
+          then db $ loadBranchCommits "master" maxMasterCommits
+          else pure $ maybe [] (.tableCommitEntities) mplotData
       lucid do
+        url <- asks (.url)
         defaultLayout_ branch.branchName do
           for_ mplotData \plotData ->
             generalizeHtmlT $
               generateCommitPlotsWith
                 (MasterComparisonEnabled plotData.masterCommits)
+                (Just (url MasterSeriesR))
                 plotData.branchCommits
                 plotData.benchmarks
           h1_ "Commits"
           table_ do
-            let commitsNewestFirst = maybe [] (reverse . (.tableCommitEntities)) mplotData
+            let commitsNewestFirst = reverse tableCommits
                 prevCommits = map Just (drop 1 commitsNewestFirst) <> repeat Nothing
             for_ (zip commitsNewestFirst prevCommits) \(Entity _ commit, mprev) -> do
               let mprevious = fmap (.entityVal) mprev
-              url <- asks (.url)
               tr_ do
                 td_ $
                   small_ $
@@ -240,6 +246,18 @@ getBranchCommitR branch hash = do
           case isMapped of
             Nothing -> notFound
             Just {} -> getCommitR hash
+
+-- | The most recent @?limit=N@ master commits as plot series, for branch pages
+-- that show more master commits than they were rendered with.
+getMasterSeriesR :: Handler Value
+getMasterSeriesR = do
+  mlimit <- fmap (>>= (RIO.readMaybe @Int . T.unpack)) $ lookupGetParam "limit"
+  let limit = max 1 $ min maxMasterCommits $ fromMaybe (defaultMasterShown True) mlimit
+  (commits, benchmarks) <- db do
+    entities <- loadBranchCommits "master" limit
+    benchmarks <- maybe (pure Map.empty) materializeCommits $ NonEmpty.nonEmpty entities
+    pure (map entityVal entities, benchmarks)
+  pure $ masterSeriesJson commits benchmarks
 
 postReceiverR :: Handler ()
 postReceiverR = do

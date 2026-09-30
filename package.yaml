@@ -44,6 +44,7 @@ dependencies:
 - persistent-sqlite
 - persistent
 - persistent-template
+- esqueleto
 - hspec-discover
 - containers
 - neat-interpolation
