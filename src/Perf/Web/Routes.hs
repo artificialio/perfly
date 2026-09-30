@@ -1,6 +1,5 @@
 module Perf.Web.Routes where
 
-import Data.Aeson (Value)
 import Data.Coerce
 import Data.Containers.ListUtils qualified as List
 import Data.Foldable
