@@ -3,7 +3,7 @@
     nixpkgs.url = "github:nixos/nixpkgs/nixpkgs-unstable";
     flake-parts.url = "github:hercules-ci/flake-parts";
     haskell-flake.url = "github:srid/haskell-flake";
-    hell.url = "github:chrisdone/hell?ref=551133cecdafed1d6d3f4da7d8a466df2eed8af5";
+    hell.url = "github:chrisdone-archive/hell?ref=551133cecdafed1d6d3f4da7d8a466df2eed8af5";
     nix2container.url = "github:nlewo/nix2container";
     nixd.url = "github:nix-community/nixd";
   };

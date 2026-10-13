@@ -92,13 +92,13 @@
       "locked": {
         "lastModified": 1737641851,
         "narHash": "sha256-qioIuZwpjj0MU8l3usFsCOZT4xQYAh1y8HZ5sWC02i4=",
-        "owner": "chrisdone",
+        "owner": "chrisdone-archive",
         "repo": "hell",
         "rev": "551133cecdafed1d6d3f4da7d8a466df2eed8af5",
         "type": "github"
       },
       "original": {
-        "owner": "chrisdone",
+        "owner": "chrisdone-archive",
         "ref": "551133cecdafed1d6d3f4da7d8a466df2eed8af5",
         "repo": "hell",
         "type": "github"
